@@ -26,6 +26,15 @@ export class Inventory extends Model {
     owner: VehicleOwner;
 
     @Column
+    day: number;
+
+    @Column
+    month: number;
+
+    @Column
+    year: number;
+
+    @Column
     registrationYear: string;
 
     @Column

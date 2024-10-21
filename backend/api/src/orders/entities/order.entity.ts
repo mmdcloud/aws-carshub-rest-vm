@@ -20,6 +20,15 @@ export class Order extends Model {
     @Column
     totalAmount: string;
 
+    @Column
+    day: number;
+
+    @Column
+    month: number;
+
+    @Column
+    year: number;
+
     @ForeignKey(() => Inventory)
     @Column
     inventoryId: number;
