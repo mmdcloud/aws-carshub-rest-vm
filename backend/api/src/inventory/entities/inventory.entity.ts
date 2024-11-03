@@ -50,7 +50,7 @@ export class Inventory extends Model {
     variant: string;
 
     @Column
-    fueltype: string;
+    fuelType: string;
 
     @Column
     transmission: string;
@@ -137,7 +137,7 @@ export class Inventory extends Model {
     cruiseControl: boolean
 
     @Column
-    ventillatedSeatsFront: boolean
+    ventilatedSeatsFront: boolean
 
     @Column
     rearAC: boolean
@@ -152,7 +152,7 @@ export class Inventory extends Model {
     gearBoxNumberOfGears: string;
 
     @Column
-    noOfDiskBreaks: string;
+    noOfDiscBrakes: string;
 
     @Column
     groundClearance: string;
@@ -203,8 +203,8 @@ export class Inventory extends Model {
     rimTypeRear: string;
 
     @Column
-    dayrimeRunningLights: boolean;
+    daytimeRunningLights: boolean;
 
     @Column
-    electricallyFoldableMirros: boolean;
+    electricallyFoldableMirrors: boolean;
 }
