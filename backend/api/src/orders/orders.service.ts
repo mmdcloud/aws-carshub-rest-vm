@@ -2,10 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { Order } from './entities/order.entity';
 import { Inventory } from 'src/inventory/entities/inventory.entity';
+import { ExtraService } from 'src/extra-services/entities/extra-service.entity';
+import { GetOrderWithExtraServicesDto } from './dto/get-order-with-extra-services.dto';
 
 @Injectable()
 export class OrdersService {
   constructor(
+    @Inject('EXTRA_SERVICES_REPOSITORY')
+    private extraServicesRepository: typeof ExtraService,
     @Inject('ORDERS_REPOSITORY')
     private ordersRepository: typeof Order,
     @Inject('INVENTORY_REPOSITORY')
@@ -36,6 +40,20 @@ export class OrdersService {
     return this.ordersRepository.findByPk<Order>(id,{
       include:["buyer","inventory"]
     });
+  }
+  
+  async getOrderDetailsWithExtraServices(id: string): Promise<GetOrderWithExtraServicesDto>
+  {
+    var response = new GetOrderWithExtraServicesDto();
+  	var orderData = await this.ordersRepository.findByPk<Order>(id);
+  	var extraServicesData = await this.extraServicesRepository.findAll<ExtraService>({
+      where:{
+        orderId:id
+      }
+    });
+    response.orderData = orderData;
+    response.extraServices = extraServicesData;
+    return response;
   }
 
   async update(id: number, updateOrderDto: UpdateOrderDto): Promise<[number, Order[]]> {

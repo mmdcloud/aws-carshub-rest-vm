@@ -9,6 +9,12 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @UseGuards(AuthGuard)
+  @Get('getOrderDetailsWithExtraServices/:id')
+  getOrderDetailsWithExtraServices(@Param('id') id: string) {
+    return this.ordersService.getOrderDetailsWithExtraServices(id);
+  }
+
+  @UseGuards(AuthGuard)
   @Post()
   create(@Body() createOrderDto: CreateOrderDto) {
     return this.ordersService.create(createOrderDto);
