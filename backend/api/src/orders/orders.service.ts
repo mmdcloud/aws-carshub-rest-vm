@@ -41,14 +41,22 @@ export class OrdersService {
       include:["buyer","inventory"]
     });
   }
+
+  async downloadInvoice(id: number): Promise<Order> {
+    return this.ordersRepository.findByPk<Order>(id,{
+      include:["buyer","inventory"]
+    });
+  }
   
   async getOrderDetailsWithExtraServices(id: string): Promise<GetOrderWithExtraServicesDto>
   {
     var response = new GetOrderWithExtraServicesDto();
-  	var orderData = await this.ordersRepository.findByPk<Order>(id);
+  	var orderData = await this.ordersRepository.findByPk<Order>(id,{    
+      include:["buyer"]
+    });
   	var extraServicesData = await this.extraServicesRepository.findAll<ExtraService>({
       where:{
-        orderId:id
+        orderId:parseInt(id)
       }
     });
     response.orderData = orderData;

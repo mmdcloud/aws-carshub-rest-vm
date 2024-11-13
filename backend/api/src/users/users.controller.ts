@@ -3,14 +3,20 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginRequestDto } from './dto/login-request.dto';
+import { ChangePasswordReqeust } from './dto/change-password-request.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Post("/login")
   login(@Body() request: LoginRequestDto) {
     return this.usersService.login(request);
+  }
+
+  @Post('/changePassword')
+  changePassword(@Body() request: ChangePasswordReqeust) {
+    return this.usersService.changePassword(request);
   }
 
   @Post()

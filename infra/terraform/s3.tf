@@ -7,6 +7,17 @@ resource "aws_s3_bucket" "vehicle-images" {
   }
 }
 
+# Creating folders
+resource "aws_s3_object" "vehicle-images-folder" {
+  bucket = aws_s3_bucket.vehicle-images.id
+  key    = "images/"
+}
+
+resource "aws_s3_object" "vehicle-documents-folder" {
+  bucket = aws_s3_bucket.vehicle-images.id
+  key    = "documents/"
+}
+
 resource "aws_s3_bucket_cors_configuration" "carshub-vehicle-images-cors" {
   bucket = aws_s3_bucket.vehicle-images.id
 

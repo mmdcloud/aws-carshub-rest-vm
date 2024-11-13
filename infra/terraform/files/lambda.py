@@ -42,8 +42,8 @@ def check_table_exists(connection, table_name):
 
 def insertQuery(connection,filename,path):
     with connection.cursor() as cursor:
-        sql = "INSERT INTO InventoryImages (inventoryId, path) VALUES (%s, %s,%s)"
-        values = (filename[0], path,filename[1])
+        sql = "INSERT INTO InventoryImages (inventoryId, path) VALUES (%s, %s)"
+        values = (filename[0], path)
         cursor.execute(sql, values)
         connection.commit()
 
@@ -64,7 +64,6 @@ def lambda_handler(event, context):
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     inventoryId VARCHAR(255) NOT NULL,
                     path VARCHAR(255) NOT NULL
-                    type VARCHAR(255) NOT NULL
                 )
                 """
                 cursor.execute(sql)

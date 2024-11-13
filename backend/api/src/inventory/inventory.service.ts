@@ -11,31 +11,31 @@ export class InventoryService {
   ) { }
 
   async getSignedUrl(payload): Promise<object> {
-    var urls = [];	  
-    const s3 = new AWS.S3({signatureVersion: 'v4',region:"us-east-1"
+    var urls = [];
+    const s3 = new AWS.S3({
+      signatureVersion: 'v4', region: "us-east-1"
     });
     const myBucket = 'theplayer007-vehicle-images';
     const signedUrlExpireSeconds = 60 * 5;
-    for(var i of payload.files)
-    {
-	const myKey = i;
-    	const url = await s3.getSignedUrlPromise('putObject', {
-        	Bucket: myBucket,
-	        Key: myKey,
-	        Expires: signedUrlExpireSeconds
-	});
-	urls.push(url);
-    }	    
+    for (var i of payload.files) {
+      const myKey = i;
+      const url = await s3.getSignedUrlPromise('putObject', {
+        Bucket: myBucket,
+        Key: myKey,
+        Expires: signedUrlExpireSeconds
+      });
+      urls.push(url);
+    }
     const response = {
-        statusCode: 200,
-        body: urls,
+      statusCode: 200,
+      body: urls,
     };
     return response;
   }
 
   async create(createInventoryDto): Promise<Inventory> {
     const record = new Inventory(createInventoryDto);
-    let indianDate = new Date().toLocaleString("en-Us", {timeZone: 'Asia/Kolkata'});
+    let indianDate = new Date().toLocaleString("en-Us", { timeZone: 'Asia/Kolkata' });
     record.day = new Date(indianDate).getDay();
     record.month = (new Date(indianDate).getMonth() + 1);
     record.year = new Date(indianDate).getFullYear();
@@ -45,13 +45,13 @@ export class InventoryService {
 
   async findAll(): Promise<Inventory[]> {
     return this.inventoryRepository.findAll<Inventory>({
-      include: ["model","owner"]
+      include: ["model", "owner"]
     });
   }
 
   async findOne(id: number): Promise<Inventory> {
-    return this.inventoryRepository.findByPk<Inventory>(id,{
-      include: ["model","owner"]
+    return this.inventoryRepository.findByPk<Inventory>(id, {
+      include: ["model", "owner"]
     });
   }
 

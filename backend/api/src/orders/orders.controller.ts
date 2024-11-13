@@ -3,10 +3,17 @@ import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { AuthGuard } from 'src/auth.guard';
+import { OrderWithExtraServicesRequestDto } from './dto/order-with-extra-services-request.dto';
 
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @UseGuards(AuthGuard)
+  @Get('/downloadInvoice')
+  downloadInvoice(@Param('id') id: string) {
+    return this.ordersService.downloadInvoice(+id);
+  }
 
   @UseGuards(AuthGuard)
   @Get('getOrderDetailsWithExtraServices/:id')
