@@ -42,8 +42,9 @@ def check_table_exists(connection, table_name):
 
 def insertQuery(connection,filename,path):
     with connection.cursor() as cursor:
-        sql = "INSERT INTO InventoryImages (inventoryId, path) VALUES (%s, %s,%s)"
-        values = (filename[0], path,filename[1])
+        record = filename[1].split("_")
+        sql = "INSERT INTO InventoryImages (inventoryId, path,type) VALUES (%s, %s,%s)"
+        values = (record[0], path,record[1])
         cursor.execute(sql, values)
         connection.commit()
 
@@ -53,7 +54,7 @@ def lambda_handler(event, context):
     print("event")
     print(event)
     table_name = "InventoryImages"
-    filename = event['Records'][0]['s3']['object']['key'].split("_")
+    filename = event['Records'][0]['s3']['object']['key'].split("/")
     try:
         if check_table_exists(connection, table_name):
             insertQuery(connection,filename,event['Records'][0]['s3']['object']['key'])
