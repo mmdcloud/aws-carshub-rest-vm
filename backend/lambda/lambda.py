@@ -43,7 +43,7 @@ def check_table_exists(connection, table_name):
 def insertQuery(connection,filename,path):
     with connection.cursor() as cursor:
         record = filename[1].split("_")
-        sql = "INSERT INTO InventoryImages (inventoryId, path,type) VALUES (%s, %s,%s)"
+        sql = "INSERT INTO InventoryImages (inventoryId, path, type) VALUES (%s, %s, %s)"
         values = (record[0], path,record[1])
         cursor.execute(sql, values)
         connection.commit()
@@ -64,7 +64,7 @@ def lambda_handler(event, context):
                     CREATE TABLE IF NOT EXISTS InventoryImages (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     inventoryId VARCHAR(255) NOT NULL,
-                    path VARCHAR(255) NOT NULL
+                    path VARCHAR(255) NOT NULL,
                     type VARCHAR(255) NOT NULL
                 )
                 """
@@ -78,6 +78,7 @@ def lambda_handler(event, context):
             'body': 'Record inserted successfully'
         }
     except Exception as e:
+        print(e)
         return {
             'statusCode': 500,
             'body': str(e)
