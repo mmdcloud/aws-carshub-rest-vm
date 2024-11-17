@@ -41,7 +41,7 @@ resource "aws_launch_template" "nodejs_template" {
 
   description = "Sample Node.js App !"
 
-  image_id = "ami-0e86e20dae9224db8"
+  image_id = "ami-005fc0f236362e99f"
 
   instance_type = "t2.micro"
 
