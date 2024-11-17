@@ -53,7 +53,7 @@ export class OrdersService {
       const browser = await puppeteer.launch({headless:true,executablePath: '/usr/bin/google-chrome-stable',
         args: ['--no-sandbox']});
       const page = await browser.newPage();
-      await page.goto('http://localhost:3001/index.html', { waitUntil: 'networkidle0' });
+      await page.goto('http://localhost:3000/index.html', { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({ format: 'A4', });
       await browser.close();
       return pdf;
