@@ -31,12 +31,13 @@ export class UsersService {
   }
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<any> {
-    const response = await this.usersRepository.update(updateUserDto, {
-      where: { id },
-    });
-    if(response[0] > 0)
-    {
-      return this.usersRepository.findByPk<User>(id)
+    const response = await this.usersRepository.update(
+      updateUserDto
+      , {
+        where: { id: id },
+      });
+    if (response[0] > 0) {
+      return this.usersRepository.findByPk<User>(id);
     }
     return response;
   }
@@ -47,8 +48,8 @@ export class UsersService {
 
   async changePassword(request: ChangePasswordReqeust): Promise<any> {
     const salt = await bcrypt.genSalt();
-    const hash = await bcrypt.hash(request.password, salt);    
-    return this.usersRepository.update({password:hash},{ where: { id: request.id } });
+    const hash = await bcrypt.hash(request.password, salt);
+    return this.usersRepository.update({ password: hash }, { where: { id: request.id } });
   }
 
   async login(loginRequest: LoginRequestDto): Promise<LoginResponse> {
@@ -76,5 +77,5 @@ export class UsersService {
       sub: record[0].id, contact: record[0].contact, id: record[0].id
     });
     return response;
-  } 
+  }
 }

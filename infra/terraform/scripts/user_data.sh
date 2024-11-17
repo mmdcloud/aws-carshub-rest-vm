@@ -1,5 +1,6 @@
 #!/bin/bash
-sudo apt-get update
+sudo apt-get update -y
+sudo apt-get upgrade -y
 # Installing Nginx
 sudo apt-get install -y nginx
 # Installing Node.js
@@ -21,6 +22,15 @@ cd /home/ubuntu/nodeapp/
 cp scripts/default /etc/nginx/sites-available/
 # Installing dependencies
 sudo npm i
+
+# Installing puppeteer
+sudo apt install -y libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi-dev libxtst-dev libnss3 libcups2 libxss1 libxrandr2 libasound2 libatk1.0-0 libatk-bridge2.0-0 libpangocairo-1.0-0 libgtk-3-0 libgbm1
+sudo npm install puppeteer
+
+# Installing Google Chrome
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt install ./google-chrome-stable_current_amd64.deb
+
 # Copying DB crendetials 
 cat > src/database.providers.ts << EOL
 import { Sequelize } from 'sequelize-typescript';

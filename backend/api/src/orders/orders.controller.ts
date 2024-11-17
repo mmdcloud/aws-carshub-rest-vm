@@ -4,6 +4,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { AuthGuard } from 'src/auth.guard';
 import { OrderWithExtraServicesRequestDto } from './dto/order-with-extra-services-request.dto';
+import { ReportDto } from './dto/report.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -13,6 +14,18 @@ export class OrdersController {
   @Get('/downloadInvoice')
   downloadInvoice(@Param('id') id: string) {
     return this.ordersService.downloadInvoice(+id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Get("/generateInvoice/:id")
+  generateInvoice(@Param('id') id: string) {
+    return this.ordersService.generateInvoice(+id);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post("/generateReport")
+  generateReport(@Body() reportDto: ReportDto) {
+    return this.ordersService.generateReport(reportDto);
   }
 
   @UseGuards(AuthGuard)

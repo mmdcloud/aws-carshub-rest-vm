@@ -4,6 +4,12 @@ import { Order } from './entities/order.entity';
 import { Inventory } from 'src/inventory/entities/inventory.entity';
 import { ExtraService } from 'src/extra-services/entities/extra-service.entity';
 import { GetOrderWithExtraServicesDto } from './dto/get-order-with-extra-services.dto';
+import puppeteer from 'puppeteer';
+import { ReportDto } from './dto/report.dto';
+import { VehicleModel } from 'src/vehicle-models/entities/vehicle-model.entity';
+import { Op } from 'sequelize';
+import { VehicleOwner } from 'src/vehicle-owners/entities/vehicle-owner.entity';
+import { Buyer } from 'src/buyers/entities/buyer.entity';
 
 @Injectable()
 export class OrdersService {
@@ -22,9 +28,9 @@ export class OrdersService {
     order.year = parseInt(createOrderDto.date.split("-")[0]);
     await this.inventoryRepository.update({
       status: "Completed"
-    },{
-      where:{
-        id:order.inventoryId
+    }, {
+      where: {
+        id: order.inventoryId
       }
     });
     return await order.save();
@@ -32,31 +38,65 @@ export class OrdersService {
 
   async findAll(): Promise<Order[]> {
     return this.ordersRepository.findAll<Order>({
-      include:["buyer","inventory"]
+      include: ["buyer", "inventory"]
     });
   }
 
   async findOne(id: number): Promise<Order> {
-    return this.ordersRepository.findByPk<Order>(id,{
-      include:["buyer","inventory"]
+    return this.ordersRepository.findByPk<Order>(id, {
+      include: ["buyer", "inventory"]
+    });
+  }
+
+  async generateInvoice(id: number): Promise<Uint8Array> {
+    try {
+      const browser = await puppeteer.launch({headless:true,args: ['--no-sandbox']});
+      const page = await browser.newPage();
+      await page.goto('http://localhost:3001/index.html', { waitUntil: 'networkidle0' });
+      const pdf = await page.pdf({ format: 'A4', });
+      await browser.close();
+      return pdf;
+    }
+    catch (e) {
+      console.log(e);
+    }
+  }
+
+  async generateReport(reportDto: ReportDto): Promise<any> {
+    var fromDate = new Date(reportDto.fromDate);
+    var toDate = new Date(reportDto.toDate);
+    console.log(fromDate);
+    console.log(toDate);
+    return this.ordersRepository.findAll({
+      where: {
+        [Op.and]: [{ createdAt: { [Op.gte]: fromDate } }, { createdAt: { [Op.lte]: toDate } }],
+      },
+      include: [{
+        model: Buyer, attributes: ["id", "fullname"]
+      }, {
+        model: Inventory, attributes: ["id", "modelId", "ownerId","status","price"], include: [{
+          model: VehicleModel, include: ["brand"]
+        }, {
+          model: VehicleOwner, attributes: ["id", "fullname"]
+        }]
+      }]
     });
   }
 
   async downloadInvoice(id: number): Promise<Order> {
-    return this.ordersRepository.findByPk<Order>(id,{
-      include:["buyer","inventory"]
+    return this.ordersRepository.findByPk<Order>(id, {
+      include: ["buyer", "inventory"]
     });
   }
-  
-  async getOrderDetailsWithExtraServices(id: string): Promise<GetOrderWithExtraServicesDto>
-  {
+
+  async getOrderDetailsWithExtraServices(id: string): Promise<GetOrderWithExtraServicesDto> {
     var response = new GetOrderWithExtraServicesDto();
-  	var orderData = await this.ordersRepository.findByPk<Order>(id,{    
-      include:["buyer"]
+    var orderData = await this.ordersRepository.findByPk<Order>(id, {
+      include: ["buyer"]
     });
-  	var extraServicesData = await this.extraServicesRepository.findAll<ExtraService>({
-      where:{
-        orderId:parseInt(id)
+    var extraServicesData = await this.extraServicesRepository.findAll<ExtraService>({
+      where: {
+        orderId: parseInt(id)
       }
     });
     response.orderData = orderData;

@@ -7,6 +7,7 @@ import { VehicleOwner } from './vehicle-owners/entities/vehicle-owner.entity';
 import { ExtraService } from './extra-services/entities/extra-service.entity';
 import { Order } from './orders/entities/order.entity';
 import { Inventory } from './inventory/entities/inventory.entity';
+import { InventoryImages } from './inventory/entities/inventory-images.entity';
 
 export const databaseProviders = [
     {
@@ -14,7 +15,7 @@ export const databaseProviders = [
         useFactory: async () => {
             const sequelize = new Sequelize({
                 dialect: 'mysql',
-                host: 'terraform-20241114023911538600000002.cbggkusgag7n.us-east-1.rds.amazonaws.com',
+                host: 'terraform-20241114041307683000000002.cbggkusgag7n.us-east-1.rds.amazonaws.com',
                 port: 3306,
                 username: 'admin',
                 password: 'Mohitdixit12345!',
@@ -22,7 +23,7 @@ export const databaseProviders = [
             });
             sequelize.addModels([
                 User, Brand, Buyer, VehicleModel, VehicleOwner, ExtraService,
-                Order, Inventory
+                Order, Inventory,InventoryImages
             ]);
             await sequelize.sync({
                 force: false
