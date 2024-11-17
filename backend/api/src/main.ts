@@ -15,6 +15,6 @@ async function bootstrap() {
   });
   app.setBaseViewsDir(join(__dirname, '..', 'static'));
   app.setViewEngine('ejs');
-  await app.listen(3001);
+  await app.listen(3000);
 }
 bootstrap();
