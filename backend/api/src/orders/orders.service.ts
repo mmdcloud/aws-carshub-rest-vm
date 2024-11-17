@@ -50,7 +50,8 @@ export class OrdersService {
 
   async generateInvoice(id: number): Promise<Uint8Array> {
     try {
-      const browser = await puppeteer.launch({headless:true,args: ['--no-sandbox']});
+      const browser = await puppeteer.launch({headless:true,executablePath: '/usr/bin/google-chrome-stable',
+        args: ['--no-sandbox']});
       const page = await browser.newPage();
       await page.goto('http://localhost:3001/index.html', { waitUntil: 'networkidle0' });
       const pdf = await page.pdf({ format: 'A4', });
