@@ -45,7 +45,7 @@ resource "aws_launch_template" "nodejs_template" {
 
   instance_type = "t2.micro"
 
-  key_name = "shiv"
+  key_name = "mohit"
 
   ebs_optimized = false
 
