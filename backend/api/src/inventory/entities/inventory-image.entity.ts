@@ -2,7 +2,7 @@ import { Table, Column, Model, ForeignKey, BelongsTo } from 'sequelize-typescrip
 import { Inventory } from './inventory.entity';
 
 @Table
-export class InventoryImages extends Model {
+export class InventoryImage extends Model {
 
     @ForeignKey(() => Inventory)
     @Column

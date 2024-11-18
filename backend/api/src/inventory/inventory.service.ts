@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { UpdateInventoryDto } from './dto/update-inventory.dto';
 import { Inventory } from './entities/inventory.entity';
-import { InventoryImages } from './entities/inventory-images.entity';
+import { InventoryImage } from './entities/inventory-image.entity';
 import { InventoryDetailsDto } from './dto/inventory-details.dto';
 import puppeteer from 'puppeteer';
 const AWS = require('aws-sdk');
@@ -12,7 +12,7 @@ export class InventoryService {
     @Inject('INVENTORY_REPOSITORY')
     private inventoryRepository: typeof Inventory,
     @Inject('INVENTORY_IMAGES_REPOSITORY')
-    private inventoryImagesRepository: typeof InventoryImages
+    private inventoryImagesRepository: typeof InventoryImage
   ) { }
 
   async getSignedUrl(payload): Promise<object> {

@@ -1,8 +1,8 @@
-import { InventoryImages } from "../entities/inventory-images.entity";
+import { InventoryImage } from "../entities/inventory-image.entity";
 import { Inventory } from "../entities/inventory.entity";
 
 export class InventoryDetailsDto {
-    imageData:InventoryImages[];
+    imageData:InventoryImage[];
     inventoryData:Inventory;
-    documentData:InventoryImages[];
+    documentData:InventoryImage[];
 }
