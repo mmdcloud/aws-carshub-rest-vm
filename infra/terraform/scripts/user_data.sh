@@ -33,6 +33,7 @@ import { VehicleModel } from './vehicle-models/entities/vehicle-model.entity';
 import { VehicleOwner } from './vehicle-owners/entities/vehicle-owner.entity';
 import { ExtraService } from './extra-services/entities/extra-service.entity';
 import { Order } from './orders/entities/order.entity';
+import { InventoryImage } from './inventory/entities/inventory-image.entity';
 import { Inventory } from './inventory/entities/inventory.entity';
 
 export const databaseProviders = [
@@ -49,7 +50,7 @@ export const databaseProviders = [
                 });
                 sequelize.addModels([
                     User, Brand, Buyer, VehicleModel, VehicleOwner, ExtraService,
-                    Order, Inventory
+                    Order, Inventory, InventoryImage
                 ]);
                 await sequelize.sync({
                     force: true

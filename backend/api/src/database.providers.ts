@@ -15,7 +15,7 @@ export const databaseProviders = [
         useFactory: async () => {
             const sequelize = new Sequelize({
                 dialect: 'mysql',
-                host: 'terraform-20241118052156106700000003.cbggkusgag7n.us-east-1.rds.amazonaws.com',
+                host: 'terraform-20241118074446114900000002.cbggkusgag7n.us-east-1.rds.amazonaws.com',
                 port: 3306,
                 username: 'admin',
                 password: 'Mohitdixit12345!',
@@ -26,7 +26,7 @@ export const databaseProviders = [
                 Order, Inventory, InventoryImage
             ]);
             await sequelize.sync({
-                force: false
+                force: false,
             });
             return sequelize;
         },
