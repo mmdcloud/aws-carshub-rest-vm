@@ -23,7 +23,7 @@ export const databaseProviders = [
             });
             sequelize.addModels([
                 User, Brand, Buyer, VehicleModel, VehicleOwner, ExtraService,
-                Order, Inventory,InventoryImage
+                Order, Inventory, InventoryImage
             ]);
             await sequelize.sync({
                 force: false
