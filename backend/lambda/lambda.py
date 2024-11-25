@@ -40,11 +40,10 @@ def check_table_exists(connection, table_name):
         result = cursor.fetchone()
         return result[0] > 0
 
-def insertQuery(connection,filename,path):
+def insertQuery(connection,filename,path,metadata):
     with connection.cursor() as cursor:
-        record = filename[1].split("_")
-        sql = "INSERT INTO InventoryImages (inventoryId, path, type) VALUES (%s, %s, %s)"
-        values = (record[0], path,record[1])
+        sql = "INSERT INTO InventoryImages (inventoryId, path, type, description) VALUES (%s, %s, %s, %s)"
+        values = (metadata["inventoryid"], path,metadata["typeofdocument"],metadata["descriptionofdocument"])
         cursor.execute(sql, values)
         connection.commit()
 
@@ -55,9 +54,12 @@ def lambda_handler(event, context):
     print(event)
     table_name = "InventoryImages"
     filename = event['Records'][0]['s3']['object']['key'].split("/")
+    s3_resource = boto3.resource('s3')
+    object = s3_resource.Object('theplayer007-vehicle-images',event['Records'][0]['s3']['object']['key'])
+    metadata = object.metadata
     try:
         if check_table_exists(connection, table_name):
-            insertQuery(connection,filename,event['Records'][0]['s3']['object']['key'])
+            insertQuery(connection,filename,event['Records'][0]['s3']['object']['key'],metadata)
         else:
             with connection.cursor() as cursor:
                 sql = """
@@ -65,13 +67,14 @@ def lambda_handler(event, context):
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     inventoryId VARCHAR(255) NOT NULL,
                     path VARCHAR(255) NOT NULL,
-                    type VARCHAR(255) NOT NULL
+                    type VARCHAR(255) NOT NULL,
+                    description VARCHAR(255) NOT NULL
                 )
                 """
                 cursor.execute(sql)
                 connection.commit()
 
-            insertQuery(connection,filename,event['Records'][0]['s3']['object']['key'])
+            insertQuery(connection,filename,event['Records'][0]['s3']['object']['key'],metadata)
 
         return {
             'statusCode': 200,

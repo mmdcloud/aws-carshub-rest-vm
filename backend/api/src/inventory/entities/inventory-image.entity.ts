@@ -15,5 +15,8 @@ export class InventoryImage extends Model {
     path: string;
 
     @Column
+    description: string;
+
+    @Column
     type: string;
 }

@@ -1,3 +1,5 @@
 export class GetSignedUrlDto {
-    files:[string];
+    file:string;
+    type: string;    
+    inventoryId: string;
 }
