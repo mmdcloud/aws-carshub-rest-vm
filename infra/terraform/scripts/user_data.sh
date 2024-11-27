@@ -53,7 +53,7 @@ export const databaseProviders = [
                     Order, Inventory, InventoryImage
                 ]);
                 await sequelize.sync({
-                    force: true
+                    force: false
                 });
                 return sequelize;
             },
