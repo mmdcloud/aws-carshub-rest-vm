@@ -29,7 +29,7 @@ export class OrdersController {
   }
 
   @UseGuards(AuthGuard)
-  @Get('getOrderDetailsWithExtraServices/:id')
+  @Get('/getOrderDetailsWithExtraServices/:id')
   getOrderDetailsWithExtraServices(@Param('id') id: string) {
     return this.ordersService.getOrderDetailsWithExtraServices(id);
   }

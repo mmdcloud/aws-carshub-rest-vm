@@ -7,6 +7,9 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3({ signatureVersion: 'v4', });
+
 const s3Client = new S3Client({ region: 'us-east-1' });
 
 @Injectable()
@@ -25,11 +28,19 @@ export class InventoryService {
     var metadata = {
       "typeofdocument": payload.type,
       "descriptionofdocument": payload.description,
-      "inventoryid": payload.inventoryId,
+      "inventoryid": payload.inventoryId
     };
-    let command = new PutObjectCommand({ Bucket: myBucket, Key: myKey, Metadata: metadata });
-    const url = await getSignedUrl(s3Client, command, { expiresIn: signedUrlExpireSeconds, unsignableHeaders: new Set(["x-amz-meta-*"]), unhoistableHeaders: new Set(["x-amz-meta-*"]) });
-    console.log(url);
+    var url = await s3.getSignedUrlPromise('putObject', {
+      Bucket: myBucket,
+      Key: myKey,
+      Expires: 3000,
+      Metadata: metadata
+    });
+    // console.log(url);
+    // return url;
+    // let command = new PutObjectCommand({ Bucket: myBucket, Key: myKey, Metadata: metadata });
+    // const url = await getSignedUrl(s3Client, command, { expiresIn: signedUrlExpireSeconds, unsignableHeaders: new Set(["x-amz-meta-*"]), unhoistableHeaders: new Set(["x-amz-meta-*"]) });
+    // console.log(url);
     const response = {
       statusCode: 200,
       body: url,

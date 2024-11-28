@@ -66,8 +66,6 @@ export class OrdersService {
   async generateReport(reportDto: ReportDto): Promise<any> {
     var fromDate = new Date(reportDto.fromDate);
     var toDate = new Date(reportDto.toDate);
-    console.log(fromDate);
-    console.log(toDate);
     return this.ordersRepository.findAll({
       where: {
         [Op.and]: [{ createdAt: { [Op.gte]: fromDate } }, { createdAt: { [Op.lte]: toDate } }],
@@ -93,7 +91,15 @@ export class OrdersService {
   async getOrderDetailsWithExtraServices(id: string): Promise<GetOrderWithExtraServicesDto> {
     var response = new GetOrderWithExtraServicesDto();
     var orderData = await this.ordersRepository.findByPk<Order>(id, {
-      include: ["buyer"]
+      include: [{
+        model: Buyer, attributes: ["id", "fullname","email","city","contact"]
+      }, {
+        model: Inventory, attributes: ["id", "modelId", "ownerId","status","price"], include: [{
+          model: VehicleModel, include: ["brand"]
+        }, {
+          model: VehicleOwner, attributes: ["id", "fullname"]
+        }]
+      }]
     });
     var extraServicesData = await this.extraServicesRepository.findAll<ExtraService>({
       where: {
