@@ -16,11 +16,11 @@ export class OrdersController {
     return this.ordersService.downloadInvoice(+id);
   }
 
-  @UseGuards(AuthGuard)
-  @Get("/generateInvoice/:id")
-  generateInvoice(@Param('id') id: string) {
-    return this.ordersService.generateInvoice(+id);
-  }
+  // @UseGuards(AuthGuard)
+  // @Get("/generateInvoice/:id")
+  // generateInvoice(@Param('id') id: string) {
+  //   return this.ordersService.generateInvoice(+id);
+  // }
 
   @UseGuards(AuthGuard)
   @Post("/generateReport")

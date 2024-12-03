@@ -4,7 +4,6 @@ import { Order } from './entities/order.entity';
 import { Inventory } from 'src/inventory/entities/inventory.entity';
 import { ExtraService } from 'src/extra-services/entities/extra-service.entity';
 import { GetOrderWithExtraServicesDto } from './dto/get-order-with-extra-services.dto';
-import puppeteer from 'puppeteer';
 import { ReportDto } from './dto/report.dto';
 import { VehicleModel } from 'src/vehicle-models/entities/vehicle-model.entity';
 import { Op } from 'sequelize';
@@ -48,20 +47,20 @@ export class OrdersService {
     });
   }
 
-  async generateInvoice(id: number): Promise<Uint8Array> {
-    try {
-      const browser = await puppeteer.launch({headless:true,executablePath: '/usr/bin/google-chrome-stable',
-        args: ['--no-sandbox']});
-      const page = await browser.newPage();
-      await page.goto('http://localhost:3000/index.html', { waitUntil: 'networkidle0' });
-      const pdf = await page.pdf({ format: 'A4', });
-      await browser.close();
-      return pdf;
-    }
-    catch (e) {
-      console.log(e);
-    }
-  }
+  // async generateInvoice(id: number): Promise<Uint8Array> {
+  //   try {
+  //     const browser = await puppeteer.launch({headless:true,executablePath: '/usr/bin/google-chrome-stable',
+  //       args: ['--no-sandbox']});
+  //     const page = await browser.newPage();
+  //     await page.goto('http://localhost:3000/index.html', { waitUntil: 'networkidle0' });
+  //     const pdf = await page.pdf({ format: 'A4', });
+  //     await browser.close();
+  //     return pdf;
+  //   }
+  //   catch (e) {
+  //     console.log(e);
+  //   }
+  // }
 
   async generateReport(reportDto: ReportDto): Promise<any> {
     var fromDate = new Date(reportDto.fromDate);
