@@ -20,8 +20,8 @@ cd /home/ubuntu/nodeapp/
 
 # Setting up env variables
 cat > .env << EOL
-BASE_URL=$1
-CLOUDFRONT_DISTRIBUTION_URL=$2
+BASE_URL=$BASE_URL
+CLOUDFRONT_DISTRIBUTION_URL=$CLOUDFRONT_DISTRIBUTION_URL
 EOL
 
 # Copying Nginx config
