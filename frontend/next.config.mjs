@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     output: "standalone",
+    distDir: 'build',
+    env : {
+        BASE_URL:process.env.BASE_URL,
+        CLOUDFRONT_DISTRIBUTION_URL:process.env.CLOUDFRONT_DISTRIBUTION_URL
+    },
     images: {
         remotePatterns: [
             {
@@ -8,7 +13,7 @@ const nextConfig = {
                 protocol: "https"
             },
             {
-                hostname: "d2oauojwib43g6.cloudfront.net",
+                hostname: process.env.CLOUDFRONT_DISTRIBUTION_URL,
                 protocol: "https"
             }
         ]

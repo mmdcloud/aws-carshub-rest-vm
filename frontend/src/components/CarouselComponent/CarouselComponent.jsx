@@ -26,7 +26,7 @@ const CarouselComponent = ({ data }) => {
                                 <Image
                                     width={256}
                                     height={512}
-                                    src={"https://d2oauojwib43g6.cloudfront.net/" + x.path}
+                                    src={process.env.CLOUDFRONT_DISTRIBUTION_URL + "/" + x.path}
                                     alt="User"
                                     style={{
                                         margin: 'auto',

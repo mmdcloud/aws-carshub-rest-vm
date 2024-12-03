@@ -67,3 +67,34 @@ resource "aws_launch_template" "nodejs_template" {
 
   depends_on = [aws_db_instance.carshub-db]
 }
+
+resource "aws_launch_template" "nextjs_template" {
+  name = "nextjs_template"
+
+  description = "CarsHub Next.js frontend !"
+
+  image_id = "ami-005fc0f236362e99f"
+
+  instance_type = "t2.micro"
+
+  key_name = "mohit"
+
+  ebs_optimized = false
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.iam_instance_profile.name
+  }
+
+  instance_initiated_shutdown_behavior = "stop"
+
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [aws_security_group.asg.id]
+  }
+  user_data = base64encode(templatefile("${path.module}/scripts/user_data_frontend.sh", {
+    BASE_URL                    = "${aws_lb.lb.dns_name}"
+    CLOUDFRONT_DISTRIBUTION_URL = "${aws_cloudfront_distribution.carshub_vehicle_images_cloudfront_distribution.domain_name}"
+  }))
+
+  depends_on = [aws_lb.lb, aws_cloudfront_distribution.carshub_vehicle_images_cloudfront_distribution]
+}

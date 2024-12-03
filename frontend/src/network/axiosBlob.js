@@ -2,7 +2,8 @@ import axios from 'axios';
 
 const axiosBlob = axios.create({
 	// Configuration
-	baseURL: 'http://lb-337030458.us-east-1.elb.amazonaws.com',
+	baseURL: "http://" + process.env.BASE_URL,
+	// baseURL:"http://localhost:3002",
 	timeout: 30000,
 	responseType:"blob"	
 });
