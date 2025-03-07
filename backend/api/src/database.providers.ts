@@ -15,10 +15,13 @@ export const databaseProviders = [
         useFactory: async () => {
             const sequelize = new Sequelize({
                 dialect: 'mysql',
-                host: 'terraform-20241127035033840900000004.cbggkusgag7n.us-east-1.rds.amazonaws.com',
+                host: process.env.DB_PATH,
                 port: 3306,
-                username: 'admin',
-                password: 'Mohitdixit12345!',
+                // dialectOptions:{
+                //     sockerPath:process.env.DB_PATH
+                // },
+                username: process.env.UN,
+                password: process.env.CREDS,                
                 database: 'carshub',
             });
             sequelize.addModels([

@@ -1,7 +1,7 @@
 output "backend_load_balancer_ip" {
-  value = aws_lb.lb.dns_name
+  value = module.carshub_backend_lb.lb_dns_name
 }
 
 output "frontend_load_balancer_ip" {
-  value = aws_lb.lb_frontend.dns_name
+  value = module.carshub_frontend_lb.lb_dns_name
 }

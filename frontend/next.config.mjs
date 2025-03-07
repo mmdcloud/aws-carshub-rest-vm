@@ -1,10 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    output: "standalone",
-    distDir: 'build',
     env : {
         BASE_URL:process.env.BASE_URL,
-        CLOUDFRONT_DISTRIBUTION_URL:process.env.CLOUDFRONT_DISTRIBUTION_URL
+        CDN_URL:process.env.CDN_URL
     },
     images: {
         remotePatterns: [
@@ -13,8 +11,8 @@ const nextConfig = {
                 protocol: "https"
             },
             {
-                hostname: process.env.CLOUDFRONT_DISTRIBUTION_URL,
-                protocol: "https"
+                hostname: process.env.CDN_URL,
+                protocol: "http"
             }
         ]
     },
