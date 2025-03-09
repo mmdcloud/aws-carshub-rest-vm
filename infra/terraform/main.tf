@@ -331,11 +331,11 @@ module "carshub_media_update_function" {
     DB_NAME     = var.db_name
     REGION      = var.region
   }
-  handler                 = "lambda.lambda_handler"
-  runtime                 = "python3.12"
-  s3_bucket               = module.carshub_media_update_function_code.bucket
-  s3_key                  = "lambda.zip"
-  layers                  = [aws_lambda_layer_version.python_layer.arn]
+  handler   = "lambda.lambda_handler"
+  runtime   = "python3.12"
+  s3_bucket = module.carshub_media_update_function_code.bucket
+  s3_key    = "lambda.zip"
+  layers    = [aws_lambda_layer_version.python_layer.arn]
   # code_signing_config_arn = module.carshub_signing_profile.config_arn
 }
 
@@ -469,9 +469,9 @@ module "carshub_frontend_asg" {
   health_check_type         = "ELB"
   force_delete              = false
   # target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
-  launch_template_id        = module.carshub_frontend_launch_template.id
-  launch_template_version   = "$Latest"
+  vpc_zone_identifier     = module.carshub_public_subnets.subnets[*].id
+  launch_template_id      = module.carshub_frontend_launch_template.id
+  launch_template_version = "$Latest"
 }
 
 # Auto Scaling Group for Backend Template
@@ -485,9 +485,9 @@ module "carshub_backend_asg" {
   health_check_type         = "ELB"
   force_delete              = false
   # target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
-  launch_template_id        = module.carshub_backend_launch_template.id
-  launch_template_version   = "$Latest"
+  vpc_zone_identifier     = module.carshub_public_subnets.subnets[*].id
+  launch_template_id      = module.carshub_backend_launch_template.id
+  launch_template_version = "$Latest"
 }
 
 # Frontend Load Balancer
