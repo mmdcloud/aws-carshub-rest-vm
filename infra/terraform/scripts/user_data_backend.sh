@@ -25,7 +25,7 @@ cd /home/ubuntu/nodeapp/
 # CREDS=${CREDS}
 # EOL
 
-cat > /src/database.providers.ts <<EOL
+cat > src/database.providers.ts <<EOL
 import { Sequelize } from 'sequelize-typescript';
 import { User } from './users/entities/user.entity';
 import { Brand } from './brands/entities/brand.entity';
@@ -43,13 +43,13 @@ export const databaseProviders = [
         useFactory: async () => {
             const sequelize = new Sequelize({
                 dialect: 'mysql',
-                host: ${DB_PATH},
+                host: $DB_PATH,
                 port: 3306,
                 // dialectOptions:{
                 //     sockerPath:process.env.DB_PATH
                 // },
-                username: ${UN},
-                password: ${CREDS},                
+                username: $UN,
+                password: $CREDS,                
                 database: 'carshub',
             });
             sequelize.addModels([
