@@ -10,4 +10,16 @@ resource "aws_db_instance" "db" {
   password             = var.password
   parameter_group_name = var.parameter_group_name
   skip_final_snapshot  = var.skip_final_snapshot
+  db_subnet_group_name   = aws_db_subnet_group.rds_subnet_group.name
+  vpc_security_group_ids = var.vpc_security_group_ids
+}
+
+# Subnet group for RDS
+resource "aws_db_subnet_group" "rds_subnet_group" {
+  name       = var.subnet_group_name
+  subnet_ids = var.subnet_group_ids
+  
+  tags = {
+    Name = var.subnet_group_name
+  }
 }

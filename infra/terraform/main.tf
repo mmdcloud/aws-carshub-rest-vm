@@ -38,6 +38,31 @@ module "carshub_sg" {
   ]
 }
 
+# RDS Security Group
+module "carshub_rds_sg" {
+  source = "./modules/vpc/security_groups"
+  vpc_id = module.carshub_vpc.vpc_id
+  name   = "carshub_rds_sg"
+  ingress = [
+    {
+      from_port   = 3306
+      to_port     = 3306
+      protocol    = "tcp"
+      self        = "false"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "any"
+    }
+  ]
+  egress = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
 # Public Subnets
 module "carshub_public_subnets" {
   source = "./modules/vpc/subnets"
@@ -129,8 +154,14 @@ module "carshub_db" {
   parameter_group_name = "default.mysql8.0"
   username             = tostring(data.vault_generic_secret.rds.data["username"])
   password             = tostring(data.vault_generic_secret.rds.data["password"])
-  publicly_accessible  = true
-  skip_final_snapshot  = true
+  subnet_group_name    = "carshub_rds_subnet_group"
+  subnet_group_ids = [
+    module.carshub_public_subnets.subnets[0].id,
+    module.carshub_public_subnets.subnets[1].id
+  ]
+  vpc_security_group_ids = [module.carshub_rds_sg.id]
+  publicly_accessible    = false
+  skip_final_snapshot    = true
 }
 
 # S3 buckets
@@ -468,10 +499,10 @@ module "carshub_frontend_asg" {
   health_check_grace_period = 300
   health_check_type         = "ELB"
   force_delete              = false
-  # target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
-  vpc_zone_identifier     = module.carshub_public_subnets.subnets[*].id
-  launch_template_id      = module.carshub_frontend_launch_template.id
-  launch_template_version = "$Latest"
+  target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
+  vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
+  launch_template_id        = module.carshub_frontend_launch_template.id
+  launch_template_version   = "$Latest"
 }
 
 # Auto Scaling Group for Backend Template
@@ -484,10 +515,10 @@ module "carshub_backend_asg" {
   health_check_grace_period = 300
   health_check_type         = "ELB"
   force_delete              = false
-  # target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
-  vpc_zone_identifier     = module.carshub_public_subnets.subnets[*].id
-  launch_template_id      = module.carshub_backend_launch_template.id
-  launch_template_version = "$Latest"
+  target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
+  vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
+  launch_template_id        = module.carshub_backend_launch_template.id
+  launch_template_version   = "$Latest"
 }
 
 # Frontend Load Balancer
@@ -506,7 +537,7 @@ module "carshub_frontend_lb" {
       target_port                      = 80
       target_ip_address_type           = "ipv4"
       target_protocol                  = "HTTP"
-      target_type                      = "ip"
+      target_type                      = "instance"
       target_vpc_id                    = module.carshub_vpc.vpc_id
       health_check_interval            = 30
       health_check_path                = "/auth/signin"
@@ -548,7 +579,7 @@ module "carshub_backend_lb" {
       target_port                      = 80
       target_ip_address_type           = "ipv4"
       target_protocol                  = "HTTP"
-      target_type                      = "ip"
+      target_type                      = "instance"
       target_vpc_id                    = module.carshub_vpc.vpc_id
       health_check_interval            = 30
       health_check_path                = "/"
