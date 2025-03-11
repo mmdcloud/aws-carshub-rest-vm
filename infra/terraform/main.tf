@@ -534,7 +534,7 @@ module "carshub_frontend_lb" {
   target_groups = [
     {
       target_group_name                = "carshub-frontend-target-group"
-      target_port                      = 80
+      target_port                      = 3000
       target_ip_address_type           = "ipv4"
       target_protocol                  = "HTTP"
       target_type                      = "instance"
@@ -546,7 +546,7 @@ module "carshub_frontend_lb" {
       health_check_timeout             = 5
       health_check_healthy_threshold   = 5
       health_check_unhealthy_threshold = 2
-      health_check_port                = 80
+      health_check_port                = 3000
     }
   ]
   listeners = [
