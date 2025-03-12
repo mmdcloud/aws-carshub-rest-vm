@@ -460,7 +460,7 @@ module "carshub_frontend_launch_template" {
     }
   ]
   user_data = base64encode(templatefile("${path.module}/scripts/user_data_frontend.sh", {
-    BASE_URL = module.carshub_frontend_lb.lb_dns_name
+    BASE_URL = "http://${module.carshub_backend_lb.lb_dns_name}"
     CDN_URL  = module.carshub_media_cloudfront_distribution.domain_name
   }))
 }
@@ -498,7 +498,7 @@ module "carshub_frontend_asg" {
   desired_capacity          = 1
   health_check_grace_period = 300
   health_check_type         = "ELB"
-  force_delete              = false
+  force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
   vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
   launch_template_id        = module.carshub_frontend_launch_template.id
@@ -514,7 +514,7 @@ module "carshub_backend_asg" {
   desired_capacity          = 1
   health_check_grace_period = 300
   health_check_type         = "ELB"
-  force_delete              = false
+  force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
   vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
   launch_template_id        = module.carshub_backend_launch_template.id
@@ -533,20 +533,21 @@ module "carshub_frontend_lb" {
   subnets                    = module.carshub_public_subnets.subnets[*].id
   target_groups = [
     {
-      target_group_name                = "carshub-frontend-target-group"
-      target_port                      = 3000
-      target_ip_address_type           = "ipv4"
-      target_protocol                  = "HTTP"
-      target_type                      = "instance"
-      target_vpc_id                    = module.carshub_vpc.vpc_id
+      target_group_name      = "carshub-frontend-target-group"
+      target_port            = 80
+      target_ip_address_type = "ipv4"
+      target_protocol        = "HTTP"
+      target_type            = "instance"
+      target_vpc_id          = module.carshub_vpc.vpc_id
+
       health_check_interval            = 30
       health_check_path                = "/auth/signin"
       health_check_enabled             = true
       health_check_protocol            = "HTTP"
       health_check_timeout             = 5
-      health_check_healthy_threshold   = 5
-      health_check_unhealthy_threshold = 2
-      health_check_port                = 3000
+      health_check_healthy_threshold   = 3
+      health_check_unhealthy_threshold = 3
+      health_check_port                = 80
     }
   ]
   listeners = [
@@ -575,19 +576,20 @@ module "carshub_backend_lb" {
   subnets                    = module.carshub_public_subnets.subnets[*].id
   target_groups = [
     {
-      target_group_name                = "carshub-backend-target-group"
-      target_port                      = 80
-      target_ip_address_type           = "ipv4"
-      target_protocol                  = "HTTP"
-      target_type                      = "instance"
-      target_vpc_id                    = module.carshub_vpc.vpc_id
+      target_group_name      = "carshub-backend-target-group"
+      target_port            = 80
+      target_ip_address_type = "ipv4"
+      target_protocol        = "HTTP"
+      target_type            = "instance"
+      target_vpc_id          = module.carshub_vpc.vpc_id
+
       health_check_interval            = 30
       health_check_path                = "/"
       health_check_enabled             = true
       health_check_protocol            = "HTTP"
       health_check_timeout             = 5
-      health_check_healthy_threshold   = 5
-      health_check_unhealthy_threshold = 2
+      health_check_healthy_threshold   = 3
+      health_check_unhealthy_threshold = 3
       health_check_port                = 80
     }
   ]
