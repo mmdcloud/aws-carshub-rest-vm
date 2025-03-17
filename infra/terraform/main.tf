@@ -14,18 +14,94 @@ module "carshub_vpc" {
 }
 
 # Security Group
-module "carshub_sg" {
+module "carshub_frontend_lb_sg" {
   source = "./modules/vpc/security_groups"
   vpc_id = module.carshub_vpc.vpc_id
-  name   = "carshub_sg"
+  name   = "carshub_frontend_lb_sg"
   ingress = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    }
+  ]
+  egress = [
     {
       from_port   = 0
       to_port     = 0
-      protocol    = -1
-      self        = "false"
+      protocol    = "-1"
       cidr_blocks = ["0.0.0.0/0"]
-      description = "any"
+    }
+  ]
+}
+
+module "carshub_backend_lb_sg" {
+  source = "./modules/vpc/security_groups"
+  vpc_id = module.carshub_vpc.vpc_id
+  name   = "carshub_backend_lb_sg"
+  ingress = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    }
+  ]
+  egress = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "carshub_asg_frontend_sg" {
+  source = "./modules/vpc/security_groups"
+  vpc_id = module.carshub_vpc.vpc_id
+  name   = "carshub_asg_frontend_sg"
+  ingress = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = []
+      security_groups = [module.carshub_frontend_lb_sg.id]
+      description     = "any"
+    }
+  ]
+  egress = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "carshub_asg_backend_sg" {
+  source = "./modules/vpc/security_groups"
+  vpc_id = module.carshub_vpc.vpc_id
+  name   = "carshub_asg_backend_sg"
+  ingress = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = []
+      security_groups = [module.carshub_backend_lb_sg.id]
+      description     = "any"
     }
   ]
   egress = [
@@ -45,12 +121,13 @@ module "carshub_rds_sg" {
   name   = "carshub_rds_sg"
   ingress = [
     {
-      from_port   = 3306
-      to_port     = 3306
-      protocol    = "tcp"
-      self        = "false"
-      cidr_blocks = ["0.0.0.0/0"]
-      description = "any"
+      from_port       = 3306
+      to_port         = 3306
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = []
+      security_groups = [module.carshub_asg_backend_sg.id]
+      description     = "any"
     }
   ]
   egress = [
@@ -209,12 +286,17 @@ module "carshub_media_bucket" {
   })
   force_destroy = true
   bucket_notification = {
-    queue = []
-    lambda_function = [
+    queue = [
       {
-        lambda_function_arn = module.carshub_media_update_function.arn
-        events              = ["s3:ObjectCreated:*"]
+        queue_arn = module.carshub_media_events_queue.arn
+        events    = ["s3:ObjectCreated:*"]
       }
+    ]
+    lambda_function = [
+      # {
+      #   lambda_function_arn = module.carshub_media_update_function.arn
+      #   events              = ["s3:ObjectCreated:*"]
+      # }
     ]
   }
 }
@@ -278,6 +360,36 @@ resource "aws_lambda_layer_version" "python_layer" {
 #   s3_bucket_destination            = module.carshub_media_update_function_code_signed.bucket
 # }
 
+# SQS Queue for buffering S3 events
+module "carshub_media_events_queue" {
+  source                        = "./modules/sqs"
+  queue_name                    = "carshub-media-events-queue"
+  delay_seconds                 = 90
+  maxReceiveCount               = 5
+  dlq_message_retention_seconds = 86400
+  dlq_name                      = "carshub-media-events-dlq"
+  max_message_size              = 2048
+  message_retention_seconds     = 86400
+  visibility_timeout_seconds    = 0
+  receive_wait_time_seconds     = 0
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "s3.amazonaws.com" }
+        Action    = "sqs:SendMessage"
+        Resource  = "arn:aws:sqs:us-east-1:*:carshub-media-events-queue"
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = module.carshub_media_bucket.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
 # Lambda IAM  Role
 module "carshub_media_update_function_iam_role" {
   source             = "./modules/iam"
@@ -316,12 +428,21 @@ module "carshub_media_update_function_iam_role" {
             {
               "Effect": "Allow",
               "Action": "secretsmanager:GetSecretValue",
-              "Resource": "*"
+              "Resource": "${module.carshub_db_credentials.arn}"
             },
             {
                 "Action": "s3:*",
                 "Effect": "Allow",
-                "Resource": "arn:aws:s3:::carshubmediabucket/*"
+                "Resource": "${module.carshub_media_bucket.arn}/*"
+            },
+            {
+              "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes"
+              ],
+              "Effect"   : "Allow",
+              "Resource" : "${module.carshub_media_events_queue.arn}"
             }
         ]
     }
@@ -349,12 +470,12 @@ module "carshub_media_update_function" {
   function_name = "carshub_media_update"
   role_arn      = module.carshub_media_update_function_iam_role.arn
   permissions = [
-    {
-      statement_id = "AllowExecutionFromS3Bucket"
-      action       = "lambda:InvokeFunction"
-      principal    = "s3.amazonaws.com"
-      source_arn   = module.carshub_media_bucket.arn
-    }
+    # {
+    #   statement_id = "AllowExecutionFromS3Bucket"
+    #   action       = "lambda:InvokeFunction"
+    #   principal    = "s3.amazonaws.com"
+    #   source_arn   = module.carshub_media_bucket.arn
+    # }
   ]
   env_variables = {
     SECRET_NAME = module.carshub_db_credentials.name
@@ -456,7 +577,7 @@ module "carshub_frontend_launch_template" {
   network_interfaces = [
     {
       associate_public_ip_address = true
-      security_groups             = [module.carshub_sg.id]
+      security_groups             = [module.carshub_asg_frontend_sg.id]
     }
   ]
   user_data = base64encode(templatefile("${path.module}/scripts/user_data_frontend.sh", {
@@ -479,7 +600,7 @@ module "carshub_backend_launch_template" {
   network_interfaces = [
     {
       associate_public_ip_address = true
-      security_groups             = [module.carshub_sg.id]
+      security_groups             = [module.carshub_asg_backend_sg.id]
     }
   ]
   user_data = base64encode(templatefile("${path.module}/scripts/user_data_backend.sh", {
@@ -529,7 +650,7 @@ module "carshub_frontend_lb" {
   lb_ip_address_type         = "ipv4"
   load_balancer_type         = "application"
   enable_deletion_protection = false
-  security_groups            = [module.carshub_sg.id]
+  security_groups            = [module.carshub_frontend_lb_sg.id]
   subnets                    = module.carshub_public_subnets.subnets[*].id
   target_groups = [
     {
@@ -572,7 +693,7 @@ module "carshub_backend_lb" {
   lb_ip_address_type         = "ipv4"
   load_balancer_type         = "application"
   enable_deletion_protection = false
-  security_groups            = [module.carshub_sg.id]
+  security_groups            = [module.carshub_backend_lb_sg.id]
   subnets                    = module.carshub_public_subnets.subnets[*].id
   target_groups = [
     {
