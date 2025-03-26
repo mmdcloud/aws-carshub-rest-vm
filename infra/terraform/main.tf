@@ -207,6 +207,21 @@ module "carshub_private_rt" {
   vpc_id  = module.carshub_vpc.vpc_id
 }
 
+# Elastic IP for Nat Gateway
+module "carshub_nat_eip" {
+  source   = "./modules/vpc/eip"
+  domain   = "vpc"
+  eip_name = "carshub_vpc_nat_eip"
+}
+
+# Nat Gateway
+module "carshub_nat" {
+  source        = "./modules/vpc/nat"
+  allocation_id = module.carshub_nat_eip.id
+  subnet_id     = module.carshub_public_subnets.subnets[0].id
+  nat_gw_name   = "carshub_vpc_nat"
+}
+
 # Secrets Manager
 module "carshub_db_credentials" {
   source                  = "./modules/secrets-manager"
