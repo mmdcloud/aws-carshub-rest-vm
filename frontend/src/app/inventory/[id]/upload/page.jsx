@@ -35,16 +35,8 @@ const Upload = () => {
                 description: payload.description,
                 inventoryId: params.id
             });
-            return axiosInstanceWithBlob.put(response.data.body, payload.files[0]
-            //      {
-            //     headers: {
-            //         'content-type': payload.files[0].type,
-            //         "x-amz-meta-typeofdocument": payload.type,
-            //         "x-amz-meta-descriptionofdocument": payload.description,
-            //         "x-amz-meta-inventoryid": params.id.toString(),
-            //     }
-            // }
-        );
+            console.log(response.data);
+            return axiosInstanceWithBlob.put(response.data, payload.files[0]);
         },
         onSuccess: (data, variables, context) => {
             toast.success("Uploaded successfully !");

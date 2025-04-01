@@ -1,2 +1,9 @@
-terraform.*
-.terraform*
+frontend/.next/*
+frontend/node_modules
+backend/node_modules
+environments/dev/terraform.*
+environments/dev/.terraform*
+environments/prod/terraform.*
+environments/prod/.terraform*
+environments/staging/terraform.*
+environments/staging/.terraform*

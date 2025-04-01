@@ -6,8 +6,14 @@ terraform {
     }
     vault = {
       source  = "hashicorp/vault"
-      version = "4.4.0"
+      version = "~> 4.0"
     }
+  }
+  backend "s3" {
+    bucket         = "carshubtfstate"
+    key            = "staging/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "carshub-terraform-locks-staging"
   }
 }
 

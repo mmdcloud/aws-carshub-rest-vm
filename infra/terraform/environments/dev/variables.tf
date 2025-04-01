@@ -8,6 +8,11 @@ variable "db_name" {
   default = "carshub"
 }
 
+variable "env" {
+  type    = string
+  default = "dev"
+}
+
 variable "vehicle-images-code-version" {
   type    = string
   default = "1"
