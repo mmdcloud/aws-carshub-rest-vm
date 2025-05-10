@@ -102,6 +102,15 @@ module "carshub_asg_backend_sg" {
       cidr_blocks     = []
       security_groups = [module.carshub_backend_lb_sg.id]
       description     = "any"
+    },
+    {
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
     }
   ]
   egress = [
@@ -495,7 +504,7 @@ module "carshub_media_update_function" {
   env_variables = {
     SECRET_NAME = module.carshub_db_credentials.name
     DB_HOST     = tostring(split(":", module.carshub_db.endpoint)[0])
-    DB_NAME     = var.db_name
+    DB_NAME     = "${module.carshub_db.name}"
     REGION      = var.region
   }
   handler   = "lambda.lambda_handler"
@@ -622,6 +631,7 @@ module "carshub_backend_launch_template" {
     DB_PATH = tostring(split(":", module.carshub_db.endpoint)[0])
     UN      = tostring(data.vault_generic_secret.rds.data["username"])
     CREDS   = tostring(data.vault_generic_secret.rds.data["password"])
+    DB_NAME = module.carshub_db.name
   }))
 }
 
