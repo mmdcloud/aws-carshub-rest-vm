@@ -9,6 +9,9 @@ variable "username" {}
 variable "password" {}
 variable "parameter_group_name" {}
 variable "skip_final_snapshot" {}
-variable "subnet_group_name"{}
-variable "subnet_group_ids"{}
-variable  "vpc_security_group_ids"{}
+variable "subnet_group_name" {}
+variable "subnet_group_ids" {}
+variable "vpc_security_group_ids" {}
+variable "backup_retention_period" {}
+variable "backup_window" {}
+variable "deletion_protection" {}
