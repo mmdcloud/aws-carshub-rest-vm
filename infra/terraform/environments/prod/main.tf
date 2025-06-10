@@ -169,15 +169,15 @@ module "carshub_private_subnets" {
   subnets = [
     {
       subnet = "10.0.6.0/24"
-      az     = "us-east-1d"
+      az     = "us-east-1a"
     },
     {
       subnet = "10.0.5.0/24"
-      az     = "us-east-1e"
+      az     = "us-east-1b"
     },
     {
       subnet = "10.0.4.0/24"
-      az     = "us-east-1f"
+      az     = "us-east-1c"
     }
   ]
   vpc_id                  = module.carshub_vpc.vpc_id
@@ -202,7 +202,7 @@ module "carshub_public_rt" {
 # Carshub Private Route Table
 module "carshub_private_rt" {
   source  = "../../modules/vpc/route_tables"
-  name    = "carshub public route table_${var.env}"
+  name    = "carshub private route table_${var.env}"
   subnets = module.carshub_private_subnets.subnets[*]
   routes  = [
     {
@@ -217,13 +217,33 @@ module "carshub_private_rt" {
 # Nat Gateway
 module "carshub_nat" {
   source      = "../../modules/vpc/nat"
-  subnet      = module.carshub_public_subnets.subnets[0].id
+  subnet      = module.carshub_private_subnets.subnets[0].id
   eip_name    = "carshub_vpc_nat_eip"
   nat_gw_name = "carshub_vpc_nat"
   domain      = "vpc"
 }
 
+# -----------------------------------------------------------------------------------------
+# VPC Flow Logs
+# -----------------------------------------------------------------------------------------
+
+resource "aws_cloudwatch_log_group" "carshub_flow_log_group" {
+  name              = "/carshub/application/${var.env}"
+  retention_in_days = 365
+}
+
+# Add VPC Flow Logs for security monitoring
+resource "aws_flow_log" "carshub_vpc_flow_log" {
+  # iam_role_arn    = aws_iam_role.vpc_flow_log_role.arn
+  log_destination = aws_cloudwatch_log_group.carshub_flow_log_group.arn
+  traffic_type    = "ALL"
+  vpc_id          = module.carshub_vpc.vpc_id
+}
+
+# -----------------------------------------------------------------------------------------
 # Secrets Manager
+# -----------------------------------------------------------------------------------------
+
 module "carshub_db_credentials" {
   source                  = "../../modules/secrets-manager"
   name                    = "carshub_rds_secrets_${var.env}"
@@ -235,30 +255,52 @@ module "carshub_db_credentials" {
   })
 }
 
+# -----------------------------------------------------------------------------------------
 # RDS Instance
+# -----------------------------------------------------------------------------------------
+
 module "carshub_db" {
-  source               = "../../modules/rds"
-  db_name              = "carshub_${var.env}"
-  allocated_storage    = 200
-  engine               = "mysql"
-  engine_version       = "8.0"
-  instance_class       = "db.t4g.large"
-  multi_az             = true
-  parameter_group_name = "default.mysql8.0"
-  username             = tostring(data.vault_generic_secret.rds.data["username"])
-  password             = tostring(data.vault_generic_secret.rds.data["password"])
-  subnet_group_name    = "carshub_rds_subnet_group"
-  backup_retention_period = 7
-  backup_window           = "03:00-05:00"
+  source                  = "../../modules/rds"
+  db_name                 = "carshub_${var.env}"
+  allocated_storage       = 100
+  engine                  = "mysql"
+  engine_version          = "8.0"
+  instance_class          = "db.t4g.large"
+  multi_az                = true
+  username                = tostring(data.vault_generic_secret.rds.data["username"])
+  password                = tostring(data.vault_generic_secret.rds.data["password"])
+  subnet_group_name       = "carshub_rds_subnet_group"
+  backup_retention_period = 35
+  backup_window           = "03:00-06:00"
   subnet_group_ids = [
     module.carshub_private_subnets.subnets[0].id,
     module.carshub_private_subnets.subnets[1].id,
     module.carshub_private_subnets.subnets[2].id
   ]
-  vpc_security_group_ids = [module.carshub_rds_sg.id]
-  publicly_accessible    = false
-  deletion_protection    = true
-  skip_final_snapshot    = false
+  vpc_security_group_ids                = [module.carshub_rds_sg.id]
+  publicly_accessible                   = false
+  deletion_protection                   = true
+  skip_final_snapshot                   = false
+  max_allocated_storage                 = 500
+  performance_insights_enabled          = true
+  performance_insights_retention_period = 7
+  monitoring_interval                   = 60
+  parameter_group_name                  = "carshub-db-pg-${var.env}"
+  parameter_group_family                = "mysql8.0"
+  parameters = [
+    {
+      name  = "max_connections"
+      value = "1000"
+    },
+    {
+      name  = "innodb_buffer_pool_size"
+      value = "{DBInstanceClassMemory*3/4}"
+    },
+    {
+      name  = "slow_query_log"
+      value = "1"
+    }
+  ]
 }
 
 # S3 buckets
@@ -360,13 +402,6 @@ module "carshub_media_update_function_code_signed" {
   ]
 }
 
-# Lambda Layer for storing dependencies
-resource "aws_lambda_layer_version" "python_layer" {
-  filename            = "../../files/python.zip"
-  layer_name          = "python"
-  compatible_runtimes = ["python3.12"]
-}
-
 # Signing profile
 module "carshub_signing_profile" {
   source                           = "../../modules/signing-profile"
@@ -381,18 +416,30 @@ module "carshub_signing_profile" {
   s3_bucket_destination            = module.carshub_media_update_function_code_signed.bucket
 }
 
+# -----------------------------------------------------------------------------------------
+# SQS Config
+# -----------------------------------------------------------------------------------------
+
+resource "aws_lambda_event_source_mapping" "sqs_event_trigger" {
+  event_source_arn                   = module.carshub_media_events_queue.arn
+  function_name                      = module.carshub_media_update_function.arn
+  enabled                            = true
+  batch_size                         = 10
+  maximum_batching_window_in_seconds = 60
+}
+
 # SQS Queue for buffering S3 events
 module "carshub_media_events_queue" {
   source                        = "../../modules/sqs"
   queue_name                    = "carshub-media-events-queue-${var.env}"
-  delay_seconds                 = 90
-  maxReceiveCount               = 5
+  delay_seconds                 = 0
+  maxReceiveCount               = 3
   dlq_message_retention_seconds = 86400
   dlq_name                      = "carshub-media-events-dlq-${var.env}"
-  max_message_size              = 2048
-  message_retention_seconds     = 86400
-  visibility_timeout_seconds    = 0
-  receive_wait_time_seconds     = 0
+  max_message_size              = 262144
+  message_retention_seconds     = 345600
+  visibility_timeout_seconds    = 180
+  receive_wait_time_seconds     = 20
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -410,6 +457,10 @@ module "carshub_media_events_queue" {
     ]
   })
 }
+
+# -----------------------------------------------------------------------------------------
+# Lambda Config
+# -----------------------------------------------------------------------------------------
 
 # Lambda IAM  Role
 module "carshub_media_update_function_iam_role" {
@@ -470,6 +521,13 @@ module "carshub_media_update_function_iam_role" {
     EOF
 }
 
+# Lambda Layer for storing dependencies
+resource "aws_lambda_layer_version" "python_layer" {
+  filename            = "../../files/python.zip"
+  layer_name          = "python"
+  compatible_runtimes = ["python3.12"]
+}
+
 # Lambda function to update media metadata in RDS database
 module "carshub_media_update_function" {
   source        = "../../modules/lambda"
@@ -490,7 +548,10 @@ module "carshub_media_update_function" {
   code_signing_config_arn = module.carshub_signing_profile.config_arn
 }
 
+# -----------------------------------------------------------------------------------------
 # Cloudfront distribution
+# -----------------------------------------------------------------------------------------
+
 module "carshub_media_cloudfront_distribution" {
   source                                = "../../modules/cloudfront"
   distribution_name                     = "carshub_media_cdn_${var.env}"
@@ -502,15 +563,15 @@ module "carshub_media_cloudfront_distribution" {
   enabled                               = true
   origin = [
     {
-      origin_id           = "carshubmediabucket${var.env}"
-      domain_name         = "carshubmediabucket${var.env}.s3.${var.region}.amazonaws.com"
+      origin_id           = "carshubmediabucket_${var.env}"
+      domain_name         = "carshubmediabucket_${var.env}.s3.${var.region}.amazonaws.com"
       connection_attempts = 3
       connection_timeout  = 10
     }
   ]
   compress                       = true
   smooth_streaming               = false
-  target_origin_id               = "carshubmediabucket${var.env}"
+  target_origin_id               = "carshubmediabucket_${var.env}"
   allowed_methods                = ["GET", "HEAD"]
   cached_methods                 = ["GET", "HEAD"]
   viewer_protocol_policy         = "redirect-to-https"
@@ -621,7 +682,7 @@ module "carshub_frontend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
+  vpc_zone_identifier       = module.carshub_private_subnets.subnets[*].id
   launch_template_id        = module.carshub_frontend_launch_template.id
   launch_template_version   = "$Latest"
 }
@@ -637,7 +698,7 @@ module "carshub_backend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.carshub_public_subnets.subnets[*].id
+  vpc_zone_identifier       = module.carshub_private_subnets.subnets[*].id
   launch_template_id        = module.carshub_backend_launch_template.id
   launch_template_version   = "$Latest"
 }
