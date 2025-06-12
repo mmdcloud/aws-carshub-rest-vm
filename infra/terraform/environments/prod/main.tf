@@ -3,7 +3,10 @@ data "vault_generic_secret" "rds" {
   path = "secret/rds"
 }
 
+# -----------------------------------------------------------------------------------------
 # VPC Configuration
+# -----------------------------------------------------------------------------------------
+
 module "carshub_vpc" {
   source                = "../../modules/vpc/vpc"
   vpc_name              = "carshub_vpc_${var.env}"
@@ -270,6 +273,7 @@ module "carshub_db" {
   username                = tostring(data.vault_generic_secret.rds.data["username"])
   password                = tostring(data.vault_generic_secret.rds.data["password"])
   subnet_group_name       = "carshub_rds_subnet_group"
+  enabled_cloudwatch_logs_exports = ["audit", "error", "general", "slowquery"]
   backup_retention_period = 35
   backup_window           = "03:00-06:00"
   subnet_group_ids = [
@@ -303,7 +307,10 @@ module "carshub_db" {
   ]
 }
 
-# S3 buckets
+# -----------------------------------------------------------------------------------------
+# S3 Configuration
+# -----------------------------------------------------------------------------------------
+
 module "carshub_media_bucket" {
   source      = "../../modules/s3"
   bucket_name = "carshubmediabucket${var.env}"
@@ -385,6 +392,10 @@ module "carshub_media_update_function_code" {
   versioning_enabled = "Enabled"
   force_destroy      = true
 }
+
+# -----------------------------------------------------------------------------------------
+# Signing Profile
+# -----------------------------------------------------------------------------------------
 
 module "carshub_media_update_function_code_signed" {
   source             = "../../modules/s3"
@@ -710,7 +721,7 @@ module "carshub_frontend_lb" {
   lb_is_internal             = false
   lb_ip_address_type         = "ipv4"
   load_balancer_type         = "application"
-  enable_deletion_protection = false
+  enable_deletion_protection = true
   security_groups            = [module.carshub_frontend_lb_sg.id]
   subnets                    = module.carshub_public_subnets.subnets[*].id
   target_groups = [
@@ -753,7 +764,7 @@ module "carshub_backend_lb" {
   lb_is_internal             = false
   lb_ip_address_type         = "ipv4"
   load_balancer_type         = "application"
-  enable_deletion_protection = false
+  enable_deletion_protection = true
   security_groups            = [module.carshub_backend_lb_sg.id]
   subnets                    = module.carshub_public_subnets.subnets[*].id
   target_groups = [

@@ -13,6 +13,7 @@ resource "aws_db_instance" "db" {
   performance_insights_retention_period = var.performance_insights_retention_period
   monitoring_interval = var.monitoring_interval
   parameter_group_name = aws_db_parameter_group.parameter_group.name
+  enabled_cloudwatch_logs_exports = var.enabled_cloudwatch_logs_exports
   backup_retention_period = 7
   backup_window        = "03:00-05:00"
   deletion_protection = var.deletion_protection
