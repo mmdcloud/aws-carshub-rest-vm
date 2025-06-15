@@ -4,29 +4,6 @@ resource "aws_codedeploy_app" "codedeploy_app" {
   tags             = var.codedeploy_app_name
 }
 
-data "aws_iam_policy_document" "codedeploy_assume_role" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["codedeploy.amazonaws.com"]
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "carshub_codedeploy_role" {
-  name               = "carshub-codedeploy-role"
-  assume_role_policy = data.aws_iam_policy_document.codedeploy_assume_role.json
-}
-
-resource "aws_iam_role_policy_attachment" "AWSCodeDeployRole" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
-  role       = aws_iam_role.carshub_codedeploy_role.name
-}
-
 resource "aws_sns_topic" "example" {
   name = "example-topic"
 }
@@ -67,5 +44,4 @@ resource "aws_codedeploy_deployment_group" "example" {
   }
 
   outdated_instances_strategy = "UPDATE"
-
 }
