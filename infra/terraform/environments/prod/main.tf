@@ -211,8 +211,18 @@ module "carshub_private_rt" {
   subnets = module.carshub_private_subnets.subnets[*]
   routes  = [
     {
-      cidr_block     = "0.0.0.0/0"
-      nat_gateway_id = module.carshub_nat.id
+      cidr_block     = module.carshub_public_subnets.subnets[0].cidr_block
+      nat_gateway_id = module.carshub_nat.nat[0].id
+      gateway_id     = ""
+    },
+    {
+      cidr_block     = module.carshub_public_subnets.subnets[1].cidr_block
+      nat_gateway_id = module.carshub_nat.nat[1].id
+      gateway_id     = ""
+    },
+    {
+      cidr_block     = module.carshub_public_subnets.subnets[2].cidr_block
+      nat_gateway_id = module.carshub_nat.nat[2].id
       gateway_id     = ""
     }
   ]
@@ -222,7 +232,7 @@ module "carshub_private_rt" {
 # Nat Gateway
 module "carshub_nat" {
   source      = "../../modules/vpc/nat"
-  subnet      = module.carshub_private_subnets.subnets[0].id
+  subnet      = module.carshub_public_subnets.subnets[0].id
   eip_name    = "carshub_vpc_nat_eip"
   nat_gw_name = "carshub_vpc_nat"
   domain      = "vpc"
@@ -232,6 +242,47 @@ module "carshub_nat" {
 # VPC Flow Logs
 # -----------------------------------------------------------------------------------------
 
+# IAM Role for VPC Flow Logs
+resource "aws_iam_role" "flow_logs_role" {
+  name = "flow-logs-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# IAM Policy for the Flow Logs Role
+resource "aws_iam_role_policy" "flow_logs_policy" {
+  name = "flow-logs-policy"
+  role = aws_iam_role.flow_logs_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_cloudwatch_log_group" "carshub_flow_log_group" {
   name              = "/carshub/application/${var.env}"
   retention_in_days = 365
@@ -239,7 +290,7 @@ resource "aws_cloudwatch_log_group" "carshub_flow_log_group" {
 
 # Add VPC Flow Logs for security monitoring
 resource "aws_flow_log" "carshub_vpc_flow_log" {
-  # iam_role_arn    = aws_iam_role.vpc_flow_log_role.arn
+  iam_role_arn    = aws_iam_role.flow_logs_role.arn
   log_destination = aws_cloudwatch_log_group.carshub_flow_log_group.arn
   traffic_type    = "ALL"
   vpc_id          = module.carshub_vpc.vpc_id
