@@ -54,9 +54,10 @@ module "carshub_backend_lb_sg" {
       to_port         = 80
       protocol        = "tcp"
       self            = "false"
-      cidr_blocks     = []
-      security_groups = [module.carshub_frontend_lb_sg.id]
-      description     = "any"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      # security_groups = [module.carshub_frontend_lb_sg.id]
+      description = "any"
     }
   ]
   egress = [
@@ -196,8 +197,8 @@ module "carshub_public_rt" {
   subnets = module.carshub_public_subnets.subnets[*]
   routes = [
     {
-      cidr_block = "0.0.0.0/0"
-      gateway_id = module.carshub_vpc.igw_id
+      cidr_block     = "0.0.0.0/0"
+      gateway_id     = module.carshub_vpc.igw_id
       nat_gateway_id = ""
     }
   ]
@@ -209,7 +210,7 @@ module "carshub_private_rt" {
   source  = "../../modules/vpc/route_tables"
   name    = "carshub private route table_${var.env}"
   subnets = module.carshub_private_subnets.subnets[*]
-  routes  = [
+  routes = [
     {
       cidr_block     = module.carshub_public_subnets.subnets[0].cidr_block
       nat_gateway_id = module.carshub_nat.nat[0].id
@@ -226,13 +227,13 @@ module "carshub_private_rt" {
       gateway_id     = ""
     }
   ]
-  vpc_id  = module.carshub_vpc.vpc_id
+  vpc_id = module.carshub_vpc.vpc_id
 }
 
 # Nat Gateway
 module "carshub_nat" {
   source      = "../../modules/vpc/nat"
-  subnet      = module.carshub_public_subnets.subnets[0].id
+  subnets     = module.carshub_public_subnets.subnets[*]
   eip_name    = "carshub_vpc_nat_eip"
   nat_gw_name = "carshub_vpc_nat"
   domain      = "vpc"
@@ -315,20 +316,43 @@ module "carshub_db_credentials" {
 # RDS Instance
 # -----------------------------------------------------------------------------------------
 
+## IAM Role for Enhanced Monitoring
+resource "aws_iam_role" "rds_monitoring_role" {
+  name = "rds-monitoring-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "monitoring.rds.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring_policy" {
+  role       = aws_iam_role.rds_monitoring_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
 module "carshub_db" {
-  source                  = "../../modules/rds"
-  db_name                 = "carshub_${var.env}"
-  allocated_storage       = 100
-  engine                  = "mysql"
-  engine_version          = "8.0"
-  instance_class          = "db.t4g.large"
-  multi_az                = true
-  username                = tostring(data.vault_generic_secret.rds.data["username"])
-  password                = tostring(data.vault_generic_secret.rds.data["password"])
-  subnet_group_name       = "carshub_rds_subnet_group"
+  source                          = "../../modules/rds"
+  db_name                         = "carshub_${var.env}"
+  allocated_storage               = 100
+  engine                          = "mysql"
+  engine_version                  = "8.0"
+  instance_class                  = "db.t4g.large"
+  multi_az                        = true
+  username                        = tostring(data.vault_generic_secret.rds.data["username"])
+  password                        = tostring(data.vault_generic_secret.rds.data["password"])
+  subnet_group_name               = "carshub_rds_subnet_group"
   enabled_cloudwatch_logs_exports = ["audit", "error", "general", "slowquery"]
-  backup_retention_period = 35
-  backup_window           = "03:00-06:00"
+  backup_retention_period         = 35
+  backup_window                   = "03:00-06:00"
   subnet_group_ids = [
     module.carshub_private_subnets.subnets[0].id,
     module.carshub_private_subnets.subnets[1].id,
@@ -342,6 +366,7 @@ module "carshub_db" {
   performance_insights_enabled          = true
   performance_insights_retention_period = 7
   monitoring_interval                   = 60
+  monitoring_role_arn                   = aws_iam_role.rds_monitoring_role.arn
   parameter_group_name                  = "carshub-db-pg-${var.env}"
   parameter_group_family                = "mysql8.0"
   parameters = [
@@ -597,18 +622,18 @@ module "carshub_media_update_function" {
   source        = "../../modules/lambda"
   function_name = "carshub_media_update_${var.env}"
   role_arn      = module.carshub_media_update_function_iam_role.arn
-  permissions = []
+  permissions   = []
   env_variables = {
     SECRET_NAME = module.carshub_db_credentials.name
     DB_HOST     = tostring(split(":", module.carshub_db.endpoint)[0])
     DB_NAME     = "${module.carshub_db.name}"
     REGION      = var.region
   }
-  handler   = "lambda.lambda_handler"
-  runtime   = "python3.12"
-  s3_bucket = module.carshub_media_update_function_code.bucket
-  s3_key    = "lambda.zip"
-  layers    = [aws_lambda_layer_version.python_layer.arn]
+  handler                 = "lambda.lambda_handler"
+  runtime                 = "python3.12"
+  s3_bucket               = module.carshub_media_update_function_code.bucket
+  s3_key                  = "lambda.zip"
+  layers                  = [aws_lambda_layer_version.python_layer.arn]
   code_signing_config_arn = module.carshub_signing_profile.config_arn
 }
 
@@ -858,460 +883,460 @@ module "carshub_backend_lb" {
 # -----------------------------------------------------------------------------------------
 
 # CodeBuild IAM Role
-data "aws_iam_policy_document" "codebuild_assume_role" {
-  statement {
-    effect = "Allow"
+# data "aws_iam_policy_document" "codebuild_assume_role" {
+#   statement {
+#     effect = "Allow"
 
-    principals {
-      type        = "Service"
-      identifiers = ["codebuild.amazonaws.com"]
-    }
+#     principals {
+#       type        = "Service"
+#       identifiers = ["codebuild.amazonaws.com"]
+#     }
 
-    actions = ["sts:AssumeRole"]
-  }
-}
+#     actions = ["sts:AssumeRole"]
+#   }
+# }
 
-resource "aws_iam_role" "carshub_codebuild_iam_role" {
-  name               = "carshub-codebuild-iam-role-${var.env}"
-  assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
-}
+# resource "aws_iam_role" "carshub_codebuild_iam_role" {
+#   name               = "carshub-codebuild-iam-role-${var.env}"
+#   assume_role_policy = data.aws_iam_policy_document.codebuild_assume_role.json
+# }
 
-data "aws_iam_policy_document" "codebuild_cache_bucket_policy_document" {
-  statement {
-    effect = "Allow"
+# data "aws_iam_policy_document" "codebuild_cache_bucket_policy_document" {
+#   statement {
+#     effect = "Allow"
 
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
+#     actions = [
+#       "logs:CreateLogGroup",
+#       "logs:CreateLogStream",
+#       "logs:PutLogEvents",
+#     ]
 
-    resources = ["*"]
-  }
+#     resources = ["*"]
+#   }
 
-  statement {
-    effect    = "Allow"
-    actions   = ["s3:*"]
-    resources = ["*"]
-  }
+#   statement {
+#     effect    = "Allow"
+#     actions   = ["s3:*"]
+#     resources = ["*"]
+#   }
 
-  statement {
-    effect    = "Allow"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
+#   statement {
+#     effect    = "Allow"
+#     actions   = ["ecr:GetAuthorizationToken"]
+#     resources = ["*"]
+#   }
 
-  statement {
-    effect = "Allow"
-    actions = [
-      "ecr:BatchGetImage",
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:CompleteLayerUpload",
-      "ecr:DescribeImages",
-      "ecr:DescribeRepositories",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:InitiateLayerUpload",
-      "ecr:ListImages",
-      "ecr:PutImage",
-      "ecr:UploadLayerPart"
-    ]
-    # resources = [module.carshub_frontend_container_registry.arn, module.carshub_backend_container_registry.arn]
-  }
-}
+#   statement {
+#     effect = "Allow"
+#     actions = [
+#       "ecr:BatchGetImage",
+#       "ecr:BatchCheckLayerAvailability",
+#       "ecr:CompleteLayerUpload",
+#       "ecr:DescribeImages",
+#       "ecr:DescribeRepositories",
+#       "ecr:GetDownloadUrlForLayer",
+#       "ecr:InitiateLayerUpload",
+#       "ecr:ListImages",
+#       "ecr:PutImage",
+#       "ecr:UploadLayerPart"
+#     ]
+#     # resources = [module.carshub_frontend_container_registry.arn, module.carshub_backend_container_registry.arn]
+#   }
+# }
 
-resource "aws_iam_role_policy" "carshub_codebuild_cache_bucket_policy" {
-  role   = aws_iam_role.carshub_codebuild_iam_role.name
-  policy = data.aws_iam_policy_document.codebuild_cache_bucket_policy_document.json
-}
+# resource "aws_iam_role_policy" "carshub_codebuild_cache_bucket_policy" {
+#   role   = aws_iam_role.carshub_codebuild_iam_role.name
+#   policy = data.aws_iam_policy_document.codebuild_cache_bucket_policy_document.json
+# }
 
-module "carshub_codebuild_frontend" {
-  source                        = "../../modules/devops/codebuild"
-  build_timeout                 = 60
-  cache_bucket_name             = "carshubcodebuildfrontendcache${var.env}"
-  cloudwatch_group_name         = "carshub-codebuiild-frontend-group-${var.env}"
-  cloudwatch_stream_name        = "carshub-codebuiild-frontend-stream-${var.env}"
-  codebuild_project_description = "carshub-codebuild-frontend-${var.env}"
-  codebuild_project_name        = "carshub-codebuild-frontend-${var.env}"
-  role                          = aws_iam_role.carshub_codebuild_iam_role.arn
-  compute_type                  = "BUILD_GENERAL1_SMALL"
-  env_image                     = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-  env_type                      = "LINUX_CONTAINER"
-  fetch_submodules              = true
-  force_destroy_cache_bucket    = false
-  image_pull_credentials_type   = "CODEBUILD"
-  privileged_mode               = true
-  source_location               = "https://github.com/mmdcloud/aws-carshub-rest-vm.git"
-  source_git_clone_depth        = "1"
-  source_type                   = "GITHUB"
-  source_version                = "frontend"
-  environment_variables = [
-    {
-      name  = "ACCOUNT_ID"
-      value = data.aws_caller_identity.current.account_id
-    },
-    {
-      name  = "REGION"
-      value = "${var.region}"
-    },
-    {
-      name  = "REPO"
-      value = "carshub_frontend_${var.env}"
-    }
-  ]
-}
+# module "carshub_codebuild_frontend" {
+#   source                        = "../../modules/devops/codebuild"
+#   build_timeout                 = 60
+#   cache_bucket_name             = "carshubcodebuildfrontendcache${var.env}"
+#   cloudwatch_group_name         = "carshub-codebuiild-frontend-group-${var.env}"
+#   cloudwatch_stream_name        = "carshub-codebuiild-frontend-stream-${var.env}"
+#   codebuild_project_description = "carshub-codebuild-frontend-${var.env}"
+#   codebuild_project_name        = "carshub-codebuild-frontend-${var.env}"
+#   role                          = aws_iam_role.carshub_codebuild_iam_role.arn
+#   compute_type                  = "BUILD_GENERAL1_SMALL"
+#   env_image                     = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
+#   env_type                      = "LINUX_CONTAINER"
+#   fetch_submodules              = true
+#   force_destroy_cache_bucket    = false
+#   image_pull_credentials_type   = "CODEBUILD"
+#   privileged_mode               = true
+#   source_location               = "https://github.com/mmdcloud/aws-carshub-rest-vm.git"
+#   source_git_clone_depth        = "1"
+#   source_type                   = "GITHUB"
+#   source_version                = "frontend"
+#   environment_variables = [
+#     {
+#       name  = "ACCOUNT_ID"
+#       value = data.aws_caller_identity.current.account_id
+#     },
+#     {
+#       name  = "REGION"
+#       value = "${var.region}"
+#     },
+#     {
+#       name  = "REPO"
+#       value = "carshub_frontend_${var.env}"
+#     }
+#   ]
+# }
 
-module "carshub_codebuild_backend" {
-  source                        = "../../modules/devops/codebuild"
-  build_timeout                 = 60
-  cache_bucket_name             = "carshubcodebuildbackendcache${var.env}"
-  cloudwatch_group_name         = "carshub-codebuiild-backend-group-${var.env}"
-  cloudwatch_stream_name        = "carshub-codebuiild-backend-stream-${var.env}"
-  codebuild_project_description = "carshub-codebuild-backend-${var.env}"
-  codebuild_project_name        = "carshub-codebuild-backend-${var.env}"
-  role                          = aws_iam_role.carshub_codebuild_iam_role.arn
-  compute_type                  = "BUILD_GENERAL1_SMALL"
-  env_image                     = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
-  env_type                      = "LINUX_CONTAINER"
-  fetch_submodules              = true
-  force_destroy_cache_bucket    = false
-  image_pull_credentials_type   = "CODEBUILD"
-  privileged_mode               = true
-  source_location               = "https://github.com/mmdcloud/aws-carshub-rest-vm.git"
-  source_git_clone_depth        = "1"
-  source_type                   = "GITHUB"
-  source_version                = "backend"
-  environment_variables = [
-    {
-      name  = "ACCOUNT_ID"
-      value = data.aws_caller_identity.current.account_id
-    },
-    {
-      name  = "REGION"
-      value = "${var.region}"
-    },
-    {
-      name  = "REPO"
-      value = "carshub_backend_${var.env}"
-    }
-  ]
-}
+# module "carshub_codebuild_backend" {
+#   source                        = "../../modules/devops/codebuild"
+#   build_timeout                 = 60
+#   cache_bucket_name             = "carshubcodebuildbackendcache${var.env}"
+#   cloudwatch_group_name         = "carshub-codebuiild-backend-group-${var.env}"
+#   cloudwatch_stream_name        = "carshub-codebuiild-backend-stream-${var.env}"
+#   codebuild_project_description = "carshub-codebuild-backend-${var.env}"
+#   codebuild_project_name        = "carshub-codebuild-backend-${var.env}"
+#   role                          = aws_iam_role.carshub_codebuild_iam_role.arn
+#   compute_type                  = "BUILD_GENERAL1_SMALL"
+#   env_image                     = "aws/codebuild/amazonlinux2-x86_64-standard:5.0"
+#   env_type                      = "LINUX_CONTAINER"
+#   fetch_submodules              = true
+#   force_destroy_cache_bucket    = false
+#   image_pull_credentials_type   = "CODEBUILD"
+#   privileged_mode               = true
+#   source_location               = "https://github.com/mmdcloud/aws-carshub-rest-vm.git"
+#   source_git_clone_depth        = "1"
+#   source_type                   = "GITHUB"
+#   source_version                = "backend"
+#   environment_variables = [
+#     {
+#       name  = "ACCOUNT_ID"
+#       value = data.aws_caller_identity.current.account_id
+#     },
+#     {
+#       name  = "REGION"
+#       value = "${var.region}"
+#     },
+#     {
+#       name  = "REPO"
+#       value = "carshub_backend_${var.env}"
+#     }
+#   ]
+# }
 
-# -----------------------------------------------------------------------------------------
-# CodeDeploy Configuration
-# -----------------------------------------------------------------------------------------
+# # -----------------------------------------------------------------------------------------
+# # CodeDeploy Configuration
+# # -----------------------------------------------------------------------------------------
 
-data "aws_iam_policy_document" "codedeploy_assume_role" {
-  statement {
-    effect = "Allow"
+# data "aws_iam_policy_document" "codedeploy_assume_role" {
+#   statement {
+#     effect = "Allow"
 
-    principals {
-      type        = "Service"
-      identifiers = ["codedeploy.amazonaws.com"]
-    }
+#     principals {
+#       type        = "Service"
+#       identifiers = ["codedeploy.amazonaws.com"]
+#     }
 
-    actions = ["sts:AssumeRole"]
-  }
-}
+#     actions = ["sts:AssumeRole"]
+#   }
+# }
 
-resource "aws_iam_role" "carshub_codedeploy_role" {
-  name               = "carshub-codedeploy-role"
-  assume_role_policy = data.aws_iam_policy_document.codedeploy_assume_role.json
-}
+# resource "aws_iam_role" "carshub_codedeploy_role" {
+#   name               = "carshub-codedeploy-role"
+#   assume_role_policy = data.aws_iam_policy_document.codedeploy_assume_role.json
+# }
 
-resource "aws_iam_role_policy_attachment" "AWSCodeDeployRole" {
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
-  role       = aws_iam_role.carshub_codedeploy_role.name
-}
+# resource "aws_iam_role_policy_attachment" "AWSCodeDeployRole" {
+#   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+#   role       = aws_iam_role.carshub_codedeploy_role.name
+# }
 
 
-# -----------------------------------------------------------------------------------------
-# CodePipeline Configuration
-# -----------------------------------------------------------------------------------------
+# # -----------------------------------------------------------------------------------------
+# # CodePipeline Configuration
+# # -----------------------------------------------------------------------------------------
 
-resource "aws_s3_bucket" "carshub_frontend_codepipeline_bucket" {
-  bucket        = "carshub-frontend-codepipeline-bucket-${var.env}"
-  force_destroy = false
-}
+# resource "aws_s3_bucket" "carshub_frontend_codepipeline_bucket" {
+#   bucket        = "carshub-frontend-codepipeline-bucket-${var.env}"
+#   force_destroy = false
+# }
 
-resource "aws_s3_bucket_public_access_block" "carshub_frontend_codepipeline_bucket_pab" {
-  bucket = aws_s3_bucket.carshub_frontend_codepipeline_bucket.id
+# resource "aws_s3_bucket_public_access_block" "carshub_frontend_codepipeline_bucket_pab" {
+#   bucket = aws_s3_bucket.carshub_frontend_codepipeline_bucket.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
+#   block_public_acls       = true
+#   block_public_policy     = true
+#   ignore_public_acls      = true
+#   restrict_public_buckets = true
+# }
 
-# CodePipeline backend artifact bucket
-resource "aws_s3_bucket" "carshub_backend_codepipeline_bucket" {
-  bucket        = "carshub-backend-codepipeline-bucket-${var.env}"
-  force_destroy = false
-}
+# # CodePipeline backend artifact bucket
+# resource "aws_s3_bucket" "carshub_backend_codepipeline_bucket" {
+#   bucket        = "carshub-backend-codepipeline-bucket-${var.env}"
+#   force_destroy = false
+# }
 
-resource "aws_s3_bucket_public_access_block" "carshub_backend_codepipeline_bucket_pab" {
-  bucket = aws_s3_bucket.carshub_backend_codepipeline_bucket.id
+# resource "aws_s3_bucket_public_access_block" "carshub_backend_codepipeline_bucket_pab" {
+#   bucket = aws_s3_bucket.carshub_backend_codepipeline_bucket.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
+#   block_public_acls       = true
+#   block_public_policy     = true
+#   ignore_public_acls      = true
+#   restrict_public_buckets = true
+# }
 
-# CodePipleine IAM Role
-resource "aws_codestarconnections_connection" "carshub_codepipeline_codestar_connection" {
-  name          = "carshub-codestar-connection"
-  provider_type = "GitHub"
-}
+# # CodePipleine IAM Role
+# resource "aws_codestarconnections_connection" "carshub_codepipeline_codestar_connection" {
+#   name          = "carshub-codestar-connection"
+#   provider_type = "GitHub"
+# }
 
-data "aws_iam_policy_document" "carshub_codepipeline_assume_role" {
-  statement {
-    effect = "Allow"
+# data "aws_iam_policy_document" "carshub_codepipeline_assume_role" {
+#   statement {
+#     effect = "Allow"
 
-    principals {
-      type        = "Service"
-      identifiers = ["codepipeline.amazonaws.com"]
-    }
+#     principals {
+#       type        = "Service"
+#       identifiers = ["codepipeline.amazonaws.com"]
+#     }
 
-    actions = ["sts:AssumeRole"]
-  }
-}
+#     actions = ["sts:AssumeRole"]
+#   }
+# }
 
-resource "aws_iam_role" "carshub_codepipeline_role" {
-  name               = "carshub-codepipeline-role-${var.env}"
-  assume_role_policy = data.aws_iam_policy_document.carshub_codepipeline_assume_role.json
-}
+# resource "aws_iam_role" "carshub_codepipeline_role" {
+#   name               = "carshub-codepipeline-role-${var.env}"
+#   assume_role_policy = data.aws_iam_policy_document.carshub_codepipeline_assume_role.json
+# }
 
-resource "aws_iam_role_policy_attachment" "codepipeline_ecs_full_access" {
-  role       = aws_iam_role.carshub_codepipeline_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
-}
+# resource "aws_iam_role_policy_attachment" "codepipeline_ecs_full_access" {
+#   role       = aws_iam_role.carshub_codepipeline_role.name
+#   policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
+# }
 
-data "aws_iam_policy_document" "codepipeline_policy" {
-  statement {
-    effect = "Allow"
-    actions = [
-      "s3:GetObject",
-      "s3:GetObjectVersion",
-      "s3:GetBucketVersioning",
-      "s3:PutObjectAcl",
-      "s3:PutObject",
-    ]
-    resources = [
-      aws_s3_bucket.carshub_frontend_codepipeline_bucket.arn,
-      "${aws_s3_bucket.carshub_frontend_codepipeline_bucket.arn}/*",
-      aws_s3_bucket.carshub_backend_codepipeline_bucket.arn,
-      "${aws_s3_bucket.carshub_backend_codepipeline_bucket.arn}/*"
-    ]
-  }
+# data "aws_iam_policy_document" "codepipeline_policy" {
+#   statement {
+#     effect = "Allow"
+#     actions = [
+#       "s3:GetObject",
+#       "s3:GetObjectVersion",
+#       "s3:GetBucketVersioning",
+#       "s3:PutObjectAcl",
+#       "s3:PutObject",
+#     ]
+#     resources = [
+#       aws_s3_bucket.carshub_frontend_codepipeline_bucket.arn,
+#       "${aws_s3_bucket.carshub_frontend_codepipeline_bucket.arn}/*",
+#       aws_s3_bucket.carshub_backend_codepipeline_bucket.arn,
+#       "${aws_s3_bucket.carshub_backend_codepipeline_bucket.arn}/*"
+#     ]
+#   }
 
-  statement {
-    effect = "Allow"
-    actions = [
-      "codedeploy:GetDeploymentConfig",
-    ]
-    resources = [
-      "arn:aws:codedeploy:${var.region}:${data.aws_caller_identity.current.account_id}:deploymentconfig:CodeDeployDefault.OneAtATime"
-    ]
-  }
+#   statement {
+#     effect = "Allow"
+#     actions = [
+#       "codedeploy:GetDeploymentConfig",
+#     ]
+#     resources = [
+#       "arn:aws:codedeploy:${var.region}:${data.aws_caller_identity.current.account_id}:deploymentconfig:CodeDeployDefault.OneAtATime"
+#     ]
+#   }
 
-  statement {
-    effect    = "Allow"
-    actions   = ["codestar-connections:UseConnection"]
-    resources = [aws_codestarconnections_connection.carshub_codepipeline_codestar_connection.arn]
-  }
+#   statement {
+#     effect    = "Allow"
+#     actions   = ["codestar-connections:UseConnection"]
+#     resources = [aws_codestarconnections_connection.carshub_codepipeline_codestar_connection.arn]
+#   }
 
-  statement {
-    effect = "Allow"
-    actions = [
-      "codebuild:BatchGetBuilds",
-      "codebuild:StartBuild",
-    ]
-    resources = ["*"]
-  }
-}
+#   statement {
+#     effect = "Allow"
+#     actions = [
+#       "codebuild:BatchGetBuilds",
+#       "codebuild:StartBuild",
+#     ]
+#     resources = ["*"]
+#   }
+# }
 
-resource "aws_iam_role_policy" "codepipeline_policy" {
-  name   = "carshub-codepipeline-policy-${var.env}"
-  role   = aws_iam_role.carshub_codepipeline_role.id
-  policy = data.aws_iam_policy_document.codepipeline_policy.json
-}
+# resource "aws_iam_role_policy" "codepipeline_policy" {
+#   name   = "carshub-codepipeline-policy-${var.env}"
+#   role   = aws_iam_role.carshub_codepipeline_role.id
+#   policy = data.aws_iam_policy_document.codepipeline_policy.json
+# }
 
-# CodePipeline for Frontend
-module "carshub_frontend_codepipeline" {
-  source              = "../../modules/devops/codepipeline"
-  name                = "carshub-frontend-codepipeline-${var.env}"
-  role_arn            = aws_iam_role.carshub_codepipeline_role.arn
-  artifact_bucket     = aws_s3_bucket.carshub_frontend_codepipeline_bucket.bucket
-  artifact_store_type = "S3"
-  stages = [
-    {
-      name = "Source"
-      actions = [
-        {
-          name             = "Source"
-          category         = "Source"
-          owner            = "AWS"
-          provider         = "CodeStarSourceConnection"
-          version          = "1"
-          action_type_id   = "Source"
-          run_order        = 1
-          input_artifacts  = []
-          output_artifacts = ["source_output"]
-          configuration = {
-            FullRepositoryId = "mmdcloud/aws-carshub-rest-vm"
-            BranchName       = "frontend"
-            ConnectionArn    = aws_codestarconnections_connection.carshub_codepipeline_codestar_connection.arn
-          }
-        }
-      ]
-    },
-    {
-      name = "Build"
-      actions = [
-        {
-          name             = "Build"
-          category         = "Build"
-          owner            = "AWS"
-          provider         = "CodeBuild"
-          version          = "1"
-          action_type_id   = "Build"
-          run_order        = 1
-          input_artifacts  = ["source_output"]
-          output_artifacts = ["build_output"]
-          configuration = {
-            ProjectName   = module.carshub_codebuild_frontend.project_name
-            PrimarySource = "source_output"
-            # EnvironmentVariables = jsonencode(module.carshub_codebuild_frontend.environment_variables)
-          }
-        }
-      ]
-    },
-    {
-      name = "Approval"
-      actions = [{
-        name             = "ManualApproval"
-        category         = "Approval"
-        owner            = "AWS"
-        provider         = "Manual"
-        input_artifacts  = []
-        output_artifacts = []
-        version          = "1"
-        configuration = {
-          NotificationArn = module.carshub_alarm_notifications.topic_arn
-          CustomData      = "Approve production deployment"
-        }
-      }]
-    },
-    {
-      name = "Deploy"
-      actions = [
-        {
-          name             = "DeployToECS"
-          category         = "Deploy"
-          owner            = "AWS"
-          provider         = "ECS"
-          version          = "1"
-          action_type_id   = "DeployToECS"
-          run_order        = 1
-          input_artifacts  = ["build_output"]
-          output_artifacts = []
-          configuration = {
-            ClusterName = aws_ecs_cluster.carshub_cluster.name
-            ServiceName = module.carshub_frontend_ecs.name
-            FileName    = "imagedefinitions.json"
-          }
-        }
-      ]
-    }
-  ]
-}
+# # CodePipeline for Frontend
+# module "carshub_frontend_codepipeline" {
+#   source              = "../../modules/devops/codepipeline"
+#   name                = "carshub-frontend-codepipeline-${var.env}"
+#   role_arn            = aws_iam_role.carshub_codepipeline_role.arn
+#   artifact_bucket     = aws_s3_bucket.carshub_frontend_codepipeline_bucket.bucket
+#   artifact_store_type = "S3"
+#   stages = [
+#     {
+#       name = "Source"
+#       actions = [
+#         {
+#           name             = "Source"
+#           category         = "Source"
+#           owner            = "AWS"
+#           provider         = "CodeStarSourceConnection"
+#           version          = "1"
+#           action_type_id   = "Source"
+#           run_order        = 1
+#           input_artifacts  = []
+#           output_artifacts = ["source_output"]
+#           configuration = {
+#             FullRepositoryId = "mmdcloud/aws-carshub-rest-vm"
+#             BranchName       = "frontend"
+#             ConnectionArn    = aws_codestarconnections_connection.carshub_codepipeline_codestar_connection.arn
+#           }
+#         }
+#       ]
+#     },
+#     {
+#       name = "Build"
+#       actions = [
+#         {
+#           name             = "Build"
+#           category         = "Build"
+#           owner            = "AWS"
+#           provider         = "CodeBuild"
+#           version          = "1"
+#           action_type_id   = "Build"
+#           run_order        = 1
+#           input_artifacts  = ["source_output"]
+#           output_artifacts = ["build_output"]
+#           configuration = {
+#             ProjectName   = module.carshub_codebuild_frontend.project_name
+#             PrimarySource = "source_output"
+#             # EnvironmentVariables = jsonencode(module.carshub_codebuild_frontend.environment_variables)
+#           }
+#         }
+#       ]
+#     },
+#     {
+#       name = "Approval"
+#       actions = [{
+#         name             = "ManualApproval"
+#         category         = "Approval"
+#         owner            = "AWS"
+#         provider         = "Manual"
+#         input_artifacts  = []
+#         output_artifacts = []
+#         version          = "1"
+#         configuration = {
+#           NotificationArn = module.carshub_alarm_notifications.topic_arn
+#           CustomData      = "Approve production deployment"
+#         }
+#       }]
+#     },
+#     {
+#       name = "Deploy"
+#       actions = [
+#         {
+#           name             = "DeployToECS"
+#           category         = "Deploy"
+#           owner            = "AWS"
+#           provider         = "ECS"
+#           version          = "1"
+#           action_type_id   = "DeployToECS"
+#           run_order        = 1
+#           input_artifacts  = ["build_output"]
+#           output_artifacts = []
+#           configuration = {
+#             ClusterName = aws_ecs_cluster.carshub_cluster.name
+#             ServiceName = module.carshub_frontend_ecs.name
+#             FileName    = "imagedefinitions.json"
+#           }
+#         }
+#       ]
+#     }
+#   ]
+# }
 
-# CodePipeline for Backend
-module "carshub_backend_codepipeline" {
-  source              = "../../modules/devops/codepipeline"
-  name                = "carshub-backend-codepipeline-${var.env}"
-  role_arn            = aws_iam_role.carshub_codepipeline_role.arn
-  artifact_bucket     = aws_s3_bucket.carshub_backend_codepipeline_bucket.bucket
-  artifact_store_type = "S3"
-  stages = [
-    {
-      name = "Source"
-      actions = [
-        {
-          name             = "Source"
-          category         = "Source"
-          owner            = "AWS"
-          provider         = "CodeStarSourceConnection"
-          version          = "1"
-          action_type_id   = "Source"
-          run_order        = 1
-          input_artifacts  = []
-          output_artifacts = ["source_output"]
-          configuration = {
-            FullRepositoryId = "mmdcloud/aws-carshub-rest-vm"
-            BranchName       = "backend"
-            ConnectionArn    = aws_codestarconnections_connection.carshub_codepipeline_codestar_connection.arn
-          }
-        }
-      ]
-    },
-    {
-      name = "Build"
-      actions = [
-        {
-          name             = "Build"
-          category         = "Build"
-          owner            = "AWS"
-          provider         = "CodeBuild"
-          version          = "1"
-          action_type_id   = "Build"
-          run_order        = 1
-          input_artifacts  = ["source_output"]
-          output_artifacts = ["build_output"]
-          configuration = {
-            ProjectName   = module.carshub_codebuild_backend.project_name
-            PrimarySource = "source_output"
-            # EnvironmentVariables = jsonencode(module.carshub_codebuild_frontend.environment_variables)
-          }
-        }
-      ]
-    },
-    {
-      name = "Approval"
-      actions = [{
-        name             = "ManualApproval"
-        category         = "Approval"
-        owner            = "AWS"
-        provider         = "Manual"
-        version          = "1"
-        input_artifacts  = []
-        output_artifacts = []
-        configuration = {
-          NotificationArn = module.carshub_alarm_notifications.topic_arn
-          CustomData      = "Approve production deployment"
-        }
-      }]
-    },
-    {
-      name = "Deploy"
-      actions = [
-        {
-          name             = "DeployToECS"
-          category         = "Deploy"
-          owner            = "AWS"
-          provider         = "ECS"
-          version          = "1"
-          action_type_id   = "DeployToECS"
-          run_order        = 1
-          input_artifacts  = ["build_output"]
-          output_artifacts = []
-          configuration = {
-            ClusterName = aws_ecs_cluster.carshub_cluster.name
-            ServiceName = module.carshub_backend_ecs.name
-            FileName    = "imagedefinitions.json"
-          }
-        }
-      ]
-    }
-  ]
-}
+# # CodePipeline for Backend
+# module "carshub_backend_codepipeline" {
+#   source              = "../../modules/devops/codepipeline"
+#   name                = "carshub-backend-codepipeline-${var.env}"
+#   role_arn            = aws_iam_role.carshub_codepipeline_role.arn
+#   artifact_bucket     = aws_s3_bucket.carshub_backend_codepipeline_bucket.bucket
+#   artifact_store_type = "S3"
+#   stages = [
+#     {
+#       name = "Source"
+#       actions = [
+#         {
+#           name             = "Source"
+#           category         = "Source"
+#           owner            = "AWS"
+#           provider         = "CodeStarSourceConnection"
+#           version          = "1"
+#           action_type_id   = "Source"
+#           run_order        = 1
+#           input_artifacts  = []
+#           output_artifacts = ["source_output"]
+#           configuration = {
+#             FullRepositoryId = "mmdcloud/aws-carshub-rest-vm"
+#             BranchName       = "backend"
+#             ConnectionArn    = aws_codestarconnections_connection.carshub_codepipeline_codestar_connection.arn
+#           }
+#         }
+#       ]
+#     },
+#     {
+#       name = "Build"
+#       actions = [
+#         {
+#           name             = "Build"
+#           category         = "Build"
+#           owner            = "AWS"
+#           provider         = "CodeBuild"
+#           version          = "1"
+#           action_type_id   = "Build"
+#           run_order        = 1
+#           input_artifacts  = ["source_output"]
+#           output_artifacts = ["build_output"]
+#           configuration = {
+#             ProjectName   = module.carshub_codebuild_backend.project_name
+#             PrimarySource = "source_output"
+#             # EnvironmentVariables = jsonencode(module.carshub_codebuild_frontend.environment_variables)
+#           }
+#         }
+#       ]
+#     },
+#     {
+#       name = "Approval"
+#       actions = [{
+#         name             = "ManualApproval"
+#         category         = "Approval"
+#         owner            = "AWS"
+#         provider         = "Manual"
+#         version          = "1"
+#         input_artifacts  = []
+#         output_artifacts = []
+#         configuration = {
+#           NotificationArn = module.carshub_alarm_notifications.topic_arn
+#           CustomData      = "Approve production deployment"
+#         }
+#       }]
+#     },
+#     {
+#       name = "Deploy"
+#       actions = [
+#         {
+#           name             = "DeployToECS"
+#           category         = "Deploy"
+#           owner            = "AWS"
+#           provider         = "ECS"
+#           version          = "1"
+#           action_type_id   = "DeployToECS"
+#           run_order        = 1
+#           input_artifacts  = ["build_output"]
+#           output_artifacts = []
+#           configuration = {
+#             ClusterName = aws_ecs_cluster.carshub_cluster.name
+#             ServiceName = module.carshub_backend_ecs.name
+#             FileName    = "imagedefinitions.json"
+#           }
+#         }
+#       ]
+#     }
+#   ]
+# }

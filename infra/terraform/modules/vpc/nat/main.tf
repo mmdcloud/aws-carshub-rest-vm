@@ -2,7 +2,7 @@ resource "aws_eip" "eip" {
   count = length(var.subnets)  
   domain = var.domain
   tags = {
-    Name = "${var.eip_name}"
+    Name = "${var.eip_name}_${count.index}"
   }
 }
 
@@ -12,6 +12,6 @@ resource "aws_nat_gateway" "nat" {
   subnet_id     = var.subnets[count.index].id
 
   tags = {
-    Name = "${var.nat_gw_name}"
+    Name = "${var.nat_gw_name}_${count.index}"
   }
 }

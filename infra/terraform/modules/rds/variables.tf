@@ -30,3 +30,4 @@ variable "enabled_cloudwatch_logs_exports" {
   type = list(string)
   default = [  ]
 }
+variable "monitoring_role_arn" {}
