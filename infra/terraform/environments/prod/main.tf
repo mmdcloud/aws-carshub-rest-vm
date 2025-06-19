@@ -205,38 +205,45 @@ module "carshub_public_rt" {
   vpc_id = module.carshub_vpc.vpc_id
 }
 
-# Carshub Private Route Table
-module "carshub_private_rt" {
-  source  = "../../modules/vpc/route_tables"
-  name    = "carshub private route table_${var.env}"
-  subnets = module.carshub_private_subnets.subnets[*]
-  routes = [
-    {
-      cidr_block     = module.carshub_public_subnets.subnets[0].cidr_block
-      nat_gateway_id = module.carshub_nat.nat[0].id
-      gateway_id     = ""
-    },
-    {
-      cidr_block     = module.carshub_public_subnets.subnets[1].cidr_block
-      nat_gateway_id = module.carshub_nat.nat[1].id
-      gateway_id     = ""
-    },
-    {
-      cidr_block     = module.carshub_public_subnets.subnets[2].cidr_block
-      nat_gateway_id = module.carshub_nat.nat[2].id
-      gateway_id     = ""
-    }
-  ]
-  vpc_id = module.carshub_vpc.vpc_id
+resource "aws_eip" "carshub_nat_eip" {
+  count  = length(module.carshub_public_subnets.subnets)
+  domain = "vpc"
+
+  tags = {
+    Name = "carshub-nat-eip-${count.index + 1}"
+  }
 }
 
-# Nat Gateway
-module "carshub_nat" {
-  source      = "../../modules/vpc/nat"
-  subnets     = module.carshub_public_subnets.subnets[*]
-  eip_name    = "carshub_vpc_nat_eip"
-  nat_gw_name = "carshub_vpc_nat"
-  domain      = "vpc"
+# NAT Gateways (one per AZ)
+resource "aws_nat_gateway" "carshub_vpc_nat" {
+  count = length(module.carshub_public_subnets.subnets)
+
+  allocation_id = aws_eip.carshub_nat_eip[count.index].id
+  subnet_id     = module.carshub_public_subnets.subnets[count.index].id
+
+  tags = {
+    Name = "carshub-nat-gateway-${count.index + 1}"
+  }
+}
+
+resource "aws_route_table" "carshub_private_rt" {
+  count  = length(aws_nat_gateway.carshub_vpc_nat)
+  vpc_id = module.carshub_vpc.vpc_id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.carshub_vpc_nat[count.index].id
+  }
+
+  tags = {
+    Name = "carshub-private-route-table-${count.index + 1}"
+  }
+}
+
+resource "aws_route_table_association" "carshub_private_rt_association" {
+  count          = length(module.carshub_private_subnets.subnets)
+  subnet_id      = module.carshub_private_subnets.subnets[count.index].id
+  route_table_id = aws_route_table.carshub_private_rt[count.index].id
 }
 
 # -----------------------------------------------------------------------------------------
