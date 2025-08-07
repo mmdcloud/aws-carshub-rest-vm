@@ -931,7 +931,7 @@ module "carshub_alarm_notifications" {
 # Target Response Time Alarm (if using ALB)
 module "carshub_frontend_ecs_alb_high_response_time" {
   source              = "../../../modules/cloudwatch/cloudwatch-alarm"
-  alarm_name          = "${aws_ecs_cluster.carshub_cluster.name}-${module.carshub_frontend_ecs.name}-high-response-time"
+  alarm_name          = "${module.carshub_frontend_lb.arn}-high-response-time"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "3"
   metric_name         = "TargetResponseTime"
@@ -953,7 +953,7 @@ module "carshub_frontend_ecs_alb_high_response_time" {
 # HTTP 5XX Error Rate Alarm (if using ALB)
 module "carshub_frontend_lb_high_5xx_errors" {
   source              = "../../../modules/cloudwatch/cloudwatch-alarm"
-  alarm_name          = "${aws_ecs_cluster.carshub_cluster.name}-${module.carshub_frontend_ecs.name}-high-5xx-errors"
+  alarm_name          = "${module.carshub_frontend_lb.arn}-high-5xx-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "1"
   metric_name         = "HTTPCode_Target_5XX_Count"
@@ -976,7 +976,7 @@ module "carshub_frontend_lb_high_5xx_errors" {
 # Target Response Time Alarm (if using ALB)
 module "carshub_backend_lb_high_response_time" {
   source              = "../../../modules/cloudwatch/cloudwatch-alarm"
-  alarm_name          = "${aws_ecs_cluster.carshub_cluster.name}-${module.carshub_backend_ecs.name}-high-response-time"
+  alarm_name          = "${module.carshub_backend_lb.arn}-high-response-time"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "3"
   metric_name         = "TargetResponseTime"
@@ -998,7 +998,7 @@ module "carshub_backend_lb_high_response_time" {
 # HTTP 5XX Error Rate Alarm (if using ALB)
 module "carshub_backend_lb_high_5xx_errors" {
   source              = "../../../modules/cloudwatch/cloudwatch-alarm"
-  alarm_name          = "${aws_ecs_cluster.carshub_cluster.name}-${module.carshub_backend_ecs.name}-high-5xx-errors"
+  alarm_name          = "${module.carshub_backend_lb.arn}-high-5xx-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "1"
   metric_name         = "HTTPCode_Target_5XX_Count"
