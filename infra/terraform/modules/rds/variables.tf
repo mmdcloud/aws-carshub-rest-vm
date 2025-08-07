@@ -16,6 +16,7 @@ variable "parameters" {
   }))
 }
 variable "skip_final_snapshot" {}
+variable "storage_type" {}
 variable "subnet_group_name" {}
 variable "subnet_group_ids" {}
 variable "vpc_security_group_ids" {}
@@ -28,6 +29,8 @@ variable "performance_insights_retention_period"{}
 variable "monitoring_interval"{}
 variable "enabled_cloudwatch_logs_exports" {
   type = list(string)
-  default = [  ]
+  default = []
 }
-variable "monitoring_role_arn" {}
+variable "monitoring_role_arn" {
+  type = string
+}
