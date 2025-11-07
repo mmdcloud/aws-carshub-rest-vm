@@ -281,9 +281,9 @@ module "carshub_db" {
   backup_retention_period         = 35
   backup_window                   = "03:00-06:00"
   subnet_group_ids = [
-    module.vpc.private_subnets[0],
-    module.vpc.private_subnets[1],
-    module.vpc.private_subnets[2]
+    module.carshub_vpc.private_subnets[0],
+    module.carshub_vpc.private_subnets[1],
+    module.carshub_vpc.private_subnets[2]
   ]
   vpc_security_group_ids                = [module.carshub_rds_sg.id]
   publicly_accessible                   = false
@@ -315,7 +315,6 @@ module "carshub_db" {
 # -----------------------------------------------------------------------------------------
 # S3 Configuration
 # -----------------------------------------------------------------------------------------
-
 module "carshub_media_bucket" {
   source      = "../../../modules/s3"
   bucket_name = "carshub-media-bucket${var.env}-${var.region}"
@@ -392,6 +391,52 @@ module "carshub_media_update_function_code" {
     {
       allowed_headers = ["*"]
       allowed_methods = ["GET"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    }
+  ]
+  versioning_enabled = "Enabled"
+  force_destroy      = true
+}
+
+module "carshub_frontend_lb_logs" {
+  source        = "./modules/s3"
+  bucket_name   = "carshub-frontend-lb-logs-${var.env}-${var.region}"
+  objects       = []
+  bucket_policy = ""
+  cors = [
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["GET"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    },
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["PUT"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    }
+  ]
+  versioning_enabled = "Enabled"
+  force_destroy      = true
+}
+
+module "carshub_backend_lb_logs" {
+  source        = "./modules/s3"
+  bucket_name   = "carshub-backend-lb-logs-${var.env}-${var.region}"
+  objects       = []
+  bucket_policy = ""
+  cors = [
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["GET"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    },
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["PUT"]
       allowed_origins = ["*"]
       max_age_seconds = 3000
     }
@@ -708,7 +753,7 @@ module "carshub_frontend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.vpc.private_subnets
+  vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_frontend_launch_template.id
   launch_template_version   = "$Latest"
 }
@@ -724,9 +769,106 @@ module "carshub_backend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.vpc.private_subnets
+  vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_backend_launch_template.id
   launch_template_version   = "$Latest"
+}
+
+# -----------------------------------------------------------------------------------------
+# Load Balancer Configuration
+# -----------------------------------------------------------------------------------------
+module "carshub_frontend_lb" {
+  source                     = "terraform-aws-modules/alb/aws"
+  name                       = "carshub-frontend-lb-${var.env}-${var.region}"
+  load_balancer_type         = "application"
+  vpc_id                     = module.carshub_vpc.vpc_id
+  subnets                    = module.carshub_vpc.public_subnets
+  enable_deletion_protection = false
+  drop_invalid_header_fields = true
+  ip_address_type            = "ipv4"
+  internal                   = false
+  security_groups = [
+    aws_security_group.frontend_lb_sg.id
+  ]
+  access_logs = {
+    bucket = "${module.carshub_frontend_lb_logs.bucket}"
+  }
+  listeners = {
+    carshub_frontend_lb_http_listener = {
+      port     = 80
+      protocol = "HTTP"
+      forward = {
+        target_group_key = "carshub_frontend_lb_target_group"
+      }
+    }
+  }
+  target_groups = {
+    carshub_frontend_lb_target_group = {
+      backend_protocol = "HTTP"
+      backend_port     = 3000
+      target_type      = "ip"
+      health_check = {
+        enabled             = true
+        healthy_threshold   = 3
+        interval            = 30
+        path                = "/auth/signin"
+        port                = 3000
+        protocol            = "HTTP"
+        unhealthy_threshold = 3
+      }
+      create_attachment = false
+    }
+  }
+  tags = {
+    Project = "carshub"
+  }
+}
+
+module "carshub_backend_lb" {
+  source                     = "terraform-aws-modules/alb/aws"
+  name                       = "carshub-backend-lb-${var.env}-${var.region}"
+  load_balancer_type         = "application"
+  vpc_id                     = module.carshub_vpc.vpc_id
+  subnets                    = module.carshub_vpc.public_subnets
+  enable_deletion_protection = false
+  drop_invalid_header_fields = true
+  ip_address_type            = "ipv4"
+  internal                   = false
+  security_groups = [
+    aws_security_group.backend_lb_sg.id
+  ]
+  access_logs = {
+    bucket = "${module.carshub_backend_lb_logs.bucket}"
+  }
+  listeners = {
+    carshub_backend_lb_http_listener = {
+      port     = 80
+      protocol = "HTTP"
+      forward = {
+        target_group_key = "carshub_backend_lb_target_group"
+      }
+    }
+  }
+  target_groups = {
+    carshub_backend_lb_target_group = {
+      backend_protocol = "HTTP"
+      backend_port     = 80
+      target_type      = "ip"
+      health_check = {
+        enabled             = true
+        healthy_threshold   = 3
+        interval            = 30
+        path                = "/"
+        port                = 80
+        protocol            = "HTTP"
+        unhealthy_threshold = 3
+      }
+      create_attachment = false
+    }
+  }
+  tags = {
+    Project = "carshub"
+  }
 }
 
 # Frontend Load Balancer
@@ -738,7 +880,7 @@ module "carshub_frontend_lb" {
   load_balancer_type         = "application"
   enable_deletion_protection = true
   security_groups            = [module.carshub_frontend_lb_sg.id]
-  subnets                    = module.vpc.public_subnets
+  subnets                    = module.carshub_vpc.public_subnets
   target_groups = [
     {
       target_group_name                = "carshub-frontend-tg-${var.env}"
@@ -780,7 +922,7 @@ module "carshub_backend_lb" {
   load_balancer_type         = "application"
   enable_deletion_protection = true
   security_groups            = [module.carshub_backend_lb_sg.id]
-  subnets                    = module.vpc.public_subnets
+  subnets                    = module.carshub_vpc.public_subnets
   target_groups = [
     {
       target_group_name                = "carshub-backend-tg-${var.env}"
