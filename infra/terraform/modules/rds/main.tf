@@ -15,8 +15,8 @@ resource "aws_db_instance" "db" {
   monitoring_interval                   = var.monitoring_interval
   monitoring_role_arn                   = var.monitoring_role_arn
   parameter_group_name                  = aws_db_parameter_group.parameter_group.name
-  backup_retention_period               = 7
-  backup_window                         = "03:00-05:00"
+  backup_retention_period               = var.backup_retention_period
+  backup_window                         = var.backup_window
   deletion_protection                   = var.deletion_protection
   enabled_cloudwatch_logs_exports       = var.enabled_cloudwatch_logs_exports
   skip_final_snapshot                   = var.skip_final_snapshot
