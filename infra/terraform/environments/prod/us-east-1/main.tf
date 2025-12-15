@@ -958,7 +958,6 @@ module "carshub_backend_lb" {
 # -----------------------------------------------------------------------------------------
 # Cloudwath Alarm Configuration
 # -----------------------------------------------------------------------------------------
-
 module "carshub_alarm_notifications" {
   source     = "../../../modules/sns"
   topic_name = "carshub_cloudwatch_alarm_notification_topic"
