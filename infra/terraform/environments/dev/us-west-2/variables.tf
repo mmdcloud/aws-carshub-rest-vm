@@ -14,12 +14,12 @@ variable "vehicle-images-code-version" {
   type    = string
 }
 
-variable "public_subnet_cidrs" {
+variable "public_subnets" {
   type        = list(string)
   description = "Public Subnet CIDR values"
 }
 
-variable "private_subnet_cidrs" {
+variable "private_subnets" {
   type        = list(string)
   description = "Private Subnet CIDR values"
 }

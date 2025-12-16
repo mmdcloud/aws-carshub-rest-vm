@@ -8,259 +8,171 @@ data "aws_caller_identity" "current" {}
 # -----------------------------------------------------------------------------------------
 # VPC Configuration
 # -----------------------------------------------------------------------------------------
-
 module "carshub_vpc" {
-  source                = "../../../modules/vpc/vpc"
-  vpc_name              = "carshub-vpc-${var.env}-${var.region}"
-  vpc_cidr_block        = "10.0.0.0/16"
-  enable_dns_hostnames  = true
-  enable_dns_support    = true
-  internet_gateway_name = "carshub-vpc-igw-${var.env}-${var.region}"
+  source                  = "../../../modules/vpc"
+  vpc_name                = "carshub-vpc-${var.env}-${var.region}"
+  vpc_cidr                = "10.0.0.0/16"
+  azs                     = var.azs
+  public_subnets          = var.public_subnets
+  private_subnets         = var.private_subnets
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  create_igw              = true
+  map_public_ip_on_launch = true
+  enable_nat_gateway      = true
+  single_nat_gateway      = false
+  one_nat_gateway_per_az  = true
+  tags = {
+    Environment = "${var.env}"
+    Project     = "carshub"
+  }
 }
 
 # Security Group
 module "carshub_frontend_lb_sg" {
-  source = "../../../modules/vpc/security_groups"
-  vpc_id = module.carshub_vpc.vpc_id
+  source = "../../../modules/security-groups"
   name   = "carshub-frontend-lb-sg-${var.env}-${var.region}"
-  ingress = [
+  vpc_id = module.carshub_vpc.vpc_id
+  ingress_rules = [
     {
-      from_port       = 80
-      to_port         = 80
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
-      security_groups = []
-      description     = "HTTP traffic"
+      description = "HTTP Traffic"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
     },
     {
-      from_port       = 443
-      to_port         = 443
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
-      security_groups = []
-      description     = "HTTPS traffic"
+      description = "HTTPS Traffic"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
     }
   ]
-  egress = [
+  egress_rules = [
     {
+      description = "Allow all outbound traffic"
       from_port   = 0
       to_port     = 0
       protocol    = "-1"
       cidr_blocks = ["0.0.0.0/0"]
     }
   ]
+  tags = {
+    Name = "carshub-frontend-lb-sg-${var.env}-${var.region}"
+  }
 }
 
 module "carshub_backend_lb_sg" {
-  source = "../../../modules/vpc/security_groups"
-  vpc_id = module.carshub_vpc.vpc_id
+  source = "../../../modules/security-groups"
   name   = "carshub-backend-lb-sg-${var.env}-${var.region}"
-  ingress = [
+  vpc_id = module.carshub_vpc.vpc_id
+  ingress_rules = [
     {
-      from_port       = 80
-      to_port         = 80
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
-      security_groups = []
-      description     = "any"
+      description = "HTTP Traffic"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
     },
     {
-      from_port       = 443
-      to_port         = 443
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
-      security_groups = []
-      description     = "HTTPS traffic"
+      description = "HTTPS Traffic"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
     }
   ]
-  egress = [
+  egress_rules = [
     {
+      description = "Allow all outbound traffic"
       from_port   = 0
       to_port     = 0
       protocol    = "-1"
       cidr_blocks = ["0.0.0.0/0"]
     }
   ]
+  tags = {
+    Name = "carshub-backend-lb-sg-${var.env}-${var.region}"
+  }
 }
 
 module "carshub_asg_frontend_sg" {
-  source = "../../../modules/vpc/security_groups"
-  vpc_id = module.carshub_vpc.vpc_id
+  source = "../../../modules/security-groups"
   name   = "carshub-asg-frontend-sg-${var.env}-${var.region}"
-  ingress = [
+  vpc_id = module.carshub_vpc.vpc_id
+  ingress_rules = [
     {
-      from_port       = 80
-      to_port         = 80
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = []
-      security_groups = [module.carshub_frontend_lb_sg.id]
-      description     = "any"
+      from_port   = 3000
+      to_port     = 3000
+      protocol    = "tcp"
+      cidr_blocks = [module.carshub_frontend_lb_sg.id]
     }
   ]
-  egress = [
+  egress_rules = [
     {
+      description = "Allow all outbound traffic"
       from_port   = 0
       to_port     = 0
       protocol    = "-1"
       cidr_blocks = ["0.0.0.0/0"]
     }
   ]
+  tags = {
+    Name = "carshub-asg-frontend-sg-${var.env}-${var.region}"
+  }
 }
 
 module "carshub_asg_backend_sg" {
-  source = "../../../modules/vpc/security_groups"
-  vpc_id = module.carshub_vpc.vpc_id
+  source = "../../../modules/security-groups"
   name   = "carshub-asg-backend-sg-${var.env}-${var.region}"
-  ingress = [
+  vpc_id = module.carshub_vpc.vpc_id
+  ingress_rules = [
     {
-      from_port       = 80
-      to_port         = 80
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = []
-      security_groups = [module.carshub_backend_lb_sg.id]
-      description     = "any"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = [module.carshub_backend_lb_sg.id]
     }
   ]
-  egress = [
+  egress_rules = [
     {
+      description = "Allow all outbound traffic"
       from_port   = 0
       to_port     = 0
       protocol    = "-1"
       cidr_blocks = ["0.0.0.0/0"]
     }
   ]
+  tags = {
+    Name = "carshub-asg-backend-sg-${var.env}-${var.region}"
+  }
 }
 
-# RDS Security Group
 module "carshub_rds_sg" {
-  source = "../../../modules/vpc/security_groups"
-  vpc_id = module.carshub_vpc.vpc_id
+  source = "../../../modules/security-groups"
   name   = "carshub-rds-sg-${var.env}-${var.region}"
-  ingress = [
+  vpc_id = module.carshub_vpc.vpc_id
+  ingress_rules = [
     {
-      from_port       = 3306
-      to_port         = 3306
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = []
-      security_groups = [module.carshub_asg_backend_sg.id]
-      description     = "any"
+      from_port   = 3306
+      to_port     = 3306
+      protocol    = "tcp"
+      cidr_blocks = [module.carshub_asg_backend_sg.id]
     }
   ]
-  egress = [
+  egress_rules = [
     {
+      description = "Allow all outbound traffic"
       from_port   = 0
       to_port     = 0
       protocol    = "-1"
       cidr_blocks = ["0.0.0.0/0"]
     }
   ]
-}
-
-# Public Subnets
-module "carshub_public_subnets" {
-  source = "../../../modules/vpc/subnets"
-  name   = "carshub-public-subnet-${var.env}-${var.region}"
-  subnets = [
-    {
-      subnet = "10.0.1.0/24"
-      az     = "${var.region}a"
-    },
-    {
-      subnet = "10.0.2.0/24"
-      az     = "${var.region}b"
-    },
-    {
-      subnet = "10.0.3.0/24"
-      az     = "${var.region}c"
-    }
-  ]
-  vpc_id                  = module.carshub_vpc.vpc_id
-  map_public_ip_on_launch = true
-}
-
-# Private Subnets
-module "carshub_private_subnets" {
-  source = "../../../modules/vpc/subnets"
-  name   = "carshub-private-subnet-${var.env}-${var.region}"
-  subnets = [
-    {
-      subnet = "10.0.4.0/24"
-      az     = "${var.region}a"
-    },
-    {
-      subnet = "10.0.5.0/24"
-      az     = "${var.region}b"
-    },
-    {
-      subnet = "10.0.6.0/24"
-      az     = "${var.region}c"
-    }
-  ]
-  vpc_id                  = module.carshub_vpc.vpc_id
-  map_public_ip_on_launch = false
-}
-
-# Carshub Public Route Table
-module "carshub_public_rt" {
-  source  = "../../../modules/vpc/route_tables"
-  name    = "carshub-public-route-table-${var.env}-${var.region}"
-  subnets = module.carshub_public_subnets.subnets[*]
-  routes = [
-    {
-      cidr_block     = "0.0.0.0/0"
-      gateway_id     = module.carshub_vpc.igw_id
-      nat_gateway_id = ""
-    }
-  ]
-  vpc_id = module.carshub_vpc.vpc_id
-}
-
-resource "aws_eip" "carshub_nat_eip" {
-  count  = length(module.carshub_public_subnets.subnets)
-  domain = "vpc"
-
   tags = {
-    Name = "carshub-nat-eip-${count.index + 1}"
+    Name = "carshub-rds-sg-${var.env}-${var.region}"
   }
-}
-
-# NAT Gateways (one per AZ)
-resource "aws_nat_gateway" "carshub_vpc_nat" {
-  count = length(module.carshub_public_subnets.subnets)
-
-  allocation_id = aws_eip.carshub_nat_eip[count.index].id
-  subnet_id     = module.carshub_public_subnets.subnets[count.index].id
-
-  tags = {
-    Name = "carshub-nat-gateway-${count.index + 1}-${var.env}-${var.region}"
-  }
-}
-
-resource "aws_route_table" "carshub_private_rt" {
-  count  = length(aws_nat_gateway.carshub_vpc_nat)
-  vpc_id = module.carshub_vpc.vpc_id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.carshub_vpc_nat[count.index].id
-  }
-
-  tags = {
-    Name = "carshub-private-route-table-${count.index + 1}-${var.env}-${var.region}"
-  }
-}
-
-resource "aws_route_table_association" "carshub_private_rt_association" {
-  count          = length(module.carshub_private_subnets.subnets)
-  subnet_id      = module.carshub_private_subnets.subnets[count.index].id
-  route_table_id = aws_route_table.carshub_private_rt[count.index].id
 }
 
 # -----------------------------------------------------------------------------------------
@@ -379,9 +291,9 @@ module "carshub_db" {
   backup_retention_period         = 35
   backup_window                   = "03:00-06:00"
   subnet_group_ids = [
-    module.carshub_private_subnets.subnets[0].id,
-    module.carshub_private_subnets.subnets[1].id,
-    module.carshub_private_subnets.subnets[2].id
+    module.carshub_vpc.private_subnets[0],
+    module.carshub_vpc.private_subnets[1],
+    module.carshub_vpc.private_subnets[2]
   ]
   vpc_security_group_ids                = [module.carshub_rds_sg.id]
   publicly_accessible                   = false
@@ -413,7 +325,6 @@ module "carshub_db" {
 # -----------------------------------------------------------------------------------------
 # S3 Configuration
 # -----------------------------------------------------------------------------------------
-
 module "carshub_media_bucket" {
   source      = "../../../modules/s3"
   bucket_name = "carshub-media-bucket${var.env}-${var.region}"
@@ -490,6 +401,52 @@ module "carshub_media_update_function_code" {
     {
       allowed_headers = ["*"]
       allowed_methods = ["GET"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    }
+  ]
+  versioning_enabled = "Enabled"
+  force_destroy      = true
+}
+
+module "carshub_frontend_lb_logs" {
+  source        = "./modules/s3"
+  bucket_name   = "carshub-frontend-lb-logs-${var.env}-${var.region}"
+  objects       = []
+  bucket_policy = ""
+  cors = [
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["GET"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    },
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["PUT"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    }
+  ]
+  versioning_enabled = "Enabled"
+  force_destroy      = true
+}
+
+module "carshub_backend_lb_logs" {
+  source        = "./modules/s3"
+  bucket_name   = "carshub-backend-lb-logs-${var.env}-${var.region}"
+  objects       = []
+  bucket_policy = ""
+  cors = [
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["GET"]
+      allowed_origins = ["*"]
+      max_age_seconds = 3000
+    },
+    {
+      allowed_headers = ["*"]
+      allowed_methods = ["PUT"]
       allowed_origins = ["*"]
       max_age_seconds = 3000
     }
@@ -806,7 +763,7 @@ module "carshub_frontend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.carshub_private_subnets.subnets[*].id
+  vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_frontend_launch_template.id
   launch_template_version   = "$Latest"
 }
@@ -822,9 +779,106 @@ module "carshub_backend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
-  vpc_zone_identifier       = module.carshub_private_subnets.subnets[*].id
+  vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_backend_launch_template.id
   launch_template_version   = "$Latest"
+}
+
+# -----------------------------------------------------------------------------------------
+# Load Balancer Configuration
+# -----------------------------------------------------------------------------------------
+module "carshub_frontend_lb" {
+  source                     = "terraform-aws-modules/alb/aws"
+  name                       = "carshub-frontend-lb-${var.env}-${var.region}"
+  load_balancer_type         = "application"
+  vpc_id                     = module.carshub_vpc.vpc_id
+  subnets                    = module.carshub_vpc.public_subnets
+  enable_deletion_protection = false
+  drop_invalid_header_fields = true
+  ip_address_type            = "ipv4"
+  internal                   = false
+  security_groups = [
+    module.frontend_lb_sg.id
+  ]
+  access_logs = {
+    bucket = "${module.carshub_frontend_lb_logs.bucket}"
+  }
+  listeners = {
+    carshub_frontend_lb_http_listener = {
+      port     = 80
+      protocol = "HTTP"
+      forward = {
+        target_group_key = "carshub_frontend_lb_target_group"
+      }
+    }
+  }
+  target_groups = {
+    carshub_frontend_lb_target_group = {
+      backend_protocol = "HTTP"
+      backend_port     = 3000
+      target_type      = "ip"
+      health_check = {
+        enabled             = true
+        healthy_threshold   = 3
+        interval            = 30
+        path                = "/auth/signin"
+        port                = 3000
+        protocol            = "HTTP"
+        unhealthy_threshold = 3
+      }
+      create_attachment = false
+    }
+  }
+  tags = {
+    Project = "carshub"
+  }
+}
+
+module "carshub_backend_lb" {
+  source                     = "terraform-aws-modules/alb/aws"
+  name                       = "carshub-backend-lb-${var.env}-${var.region}"
+  load_balancer_type         = "application"
+  vpc_id                     = module.carshub_vpc.vpc_id
+  subnets                    = module.carshub_vpc.public_subnets
+  enable_deletion_protection = false
+  drop_invalid_header_fields = true
+  ip_address_type            = "ipv4"
+  internal                   = false
+  security_groups = [
+    module.backend_lb_sg.id
+  ]
+  access_logs = {
+    bucket = "${module.carshub_backend_lb_logs.bucket}"
+  }
+  listeners = {
+    carshub_backend_lb_http_listener = {
+      port     = 80
+      protocol = "HTTP"
+      forward = {
+        target_group_key = "carshub_backend_lb_target_group"
+      }
+    }
+  }
+  target_groups = {
+    carshub_backend_lb_target_group = {
+      backend_protocol = "HTTP"
+      backend_port     = 80
+      target_type      = "ip"
+      health_check = {
+        enabled             = true
+        healthy_threshold   = 3
+        interval            = 30
+        path                = "/"
+        port                = 80
+        protocol            = "HTTP"
+        unhealthy_threshold = 3
+      }
+      create_attachment = false
+    }
+  }
+  tags = {
+    Project = "carshub"
+  }
 }
 
 # Frontend Load Balancer
@@ -836,7 +890,7 @@ module "carshub_frontend_lb" {
   load_balancer_type         = "application"
   enable_deletion_protection = true
   security_groups            = [module.carshub_frontend_lb_sg.id]
-  subnets                    = module.carshub_public_subnets.subnets[*].id
+  subnets                    = module.carshub_vpc.public_subnets
   target_groups = [
     {
       target_group_name                = "carshub-frontend-tg-${var.env}"
@@ -878,7 +932,7 @@ module "carshub_backend_lb" {
   load_balancer_type         = "application"
   enable_deletion_protection = true
   security_groups            = [module.carshub_backend_lb_sg.id]
-  subnets                    = module.carshub_public_subnets.subnets[*].id
+  subnets                    = module.carshub_vpc.public_subnets
   target_groups = [
     {
       target_group_name                = "carshub-backend-tg-${var.env}"
@@ -914,7 +968,6 @@ module "carshub_backend_lb" {
 # -----------------------------------------------------------------------------------------
 # Cloudwath Alarm Configuration
 # -----------------------------------------------------------------------------------------
-
 module "carshub_alarm_notifications" {
   source     = "../../../modules/sns"
   topic_name = "carshub_cloudwatch_alarm_notification_topic"
