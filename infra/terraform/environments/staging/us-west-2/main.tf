@@ -103,10 +103,12 @@ module "carshub_asg_frontend_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
+      description = "ASG Frontend Traffic"
       from_port   = 3000
       to_port     = 3000
       protocol    = "tcp"
-      cidr_blocks = [module.carshub_frontend_lb_sg.id]
+      security_groups = [module.carshub_frontend_lb_sg.id]
+      cidr_blocks = []
     }
   ]
   egress_rules = [
@@ -129,10 +131,12 @@ module "carshub_asg_backend_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
+      description = "ASG Backend Traffic"
       from_port   = 80
       to_port     = 80
       protocol    = "tcp"
-      cidr_blocks = [module.carshub_backend_lb_sg.id]
+      security_groups = [module.carshub_backend_lb_sg.id]
+      cidr_blocks = []
     }
   ]
   egress_rules = [
@@ -155,10 +159,12 @@ module "carshub_rds_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
+      description = "RDS Traffic"
       from_port   = 3306
       to_port     = 3306
       protocol    = "tcp"
-      cidr_blocks = [module.carshub_asg_backend_sg.id]
+      security_groups = [module.carshub_asg_backend_sg.id]
+      cidr_blocks = []
     }
   ]
   egress_rules = [
