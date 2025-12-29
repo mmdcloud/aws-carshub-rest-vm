@@ -198,8 +198,6 @@ module "carshub_db_credentials" {
 # -----------------------------------------------------------------------------------------
 # VPC Flow Logs
 # -----------------------------------------------------------------------------------------
-
-# IAM Role for VPC Flow Logs
 module "flow_logs_role" {
   source             = "../../../modules/iam"
   role_name          = "carshub-flow-logs-role-${var.env}-${var.region}"
@@ -257,7 +255,6 @@ resource "aws_flow_log" "carshub_vpc_flow_log" {
 # -----------------------------------------------------------------------------------------
 # RDS Instance
 # -----------------------------------------------------------------------------------------
-# IAM Role for Enhanced Monitoring
 resource "aws_iam_role" "rds_monitoring_role" {
   name = "carshub-rds-monitoring-role-${var.env}-${var.region}"
 

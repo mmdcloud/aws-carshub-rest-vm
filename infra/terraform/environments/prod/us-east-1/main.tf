@@ -15,6 +15,7 @@ module "carshub_vpc" {
   azs                     = var.azs
   public_subnets          = var.public_subnets
   private_subnets         = var.private_subnets
+  database_subnets        = var.database_subnets
   enable_dns_hostnames    = true
   enable_dns_support      = true
   create_igw              = true
@@ -35,14 +36,14 @@ module "carshub_frontend_lb_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description = "HTTP Traffic"
+      description = "HTTP Frontend Traffic"
       from_port   = 80
       to_port     = 80
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
     },
     {
-      description = "HTTPS Traffic"
+      description = "HTTPS Frontend Traffic"
       from_port   = 443
       to_port     = 443
       protocol    = "tcp"
@@ -69,14 +70,14 @@ module "carshub_backend_lb_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description = "HTTP Traffic"
+      description = "HTTP Backend Traffic"
       from_port   = 80
       to_port     = 80
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
     },
     {
-      description = "HTTPS Traffic"
+      description = "HTTPS Backend Traffic"
       from_port   = 443
       to_port     = 443
       protocol    = "tcp"
@@ -103,12 +104,12 @@ module "carshub_asg_frontend_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description = "ASG Frontend Traffic"
-      from_port   = 3000
-      to_port     = 3000
-      protocol    = "tcp"
+      description     = "ASG Frontend Traffic"
+      from_port       = 3000
+      to_port         = 3000
+      protocol        = "tcp"
       security_groups = [module.carshub_frontend_lb_sg.id]
-      cidr_blocks = []
+      cidr_blocks     = []
     }
   ]
   egress_rules = [
@@ -131,12 +132,12 @@ module "carshub_asg_backend_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description = "ASG Backend Traffic"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
+      description     = "ASG Backend Traffic"
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
       security_groups = [module.carshub_backend_lb_sg.id]
-      cidr_blocks = []
+      cidr_blocks     = []
     }
   ]
   egress_rules = [
@@ -159,12 +160,12 @@ module "carshub_rds_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description = "RDS Traffic"
-      from_port   = 3306
-      to_port     = 3306
-      protocol    = "tcp"
+      description     = "RDS Traffic"
+      from_port       = 3306
+      to_port         = 3306
+      protocol        = "tcp"
       security_groups = [module.carshub_asg_backend_sg.id]
-      cidr_blocks = []
+      cidr_blocks     = []
     }
   ]
   egress_rules = [
@@ -187,7 +188,7 @@ module "carshub_rds_sg" {
 module "carshub_db_credentials" {
   source                  = "../../../modules/secrets-manager"
   name                    = "carshub-rds-secrets-${var.env}-${var.region}"
-  description             = "carshub-rds-secrets-${var.env}-${var.region}"
+  description             = "Secret for storing RDS credentials"
   recovery_window_in_days = 0
   secret_string = jsonencode({
     username = tostring(data.vault_generic_secret.rds.data["username"])
@@ -201,9 +202,9 @@ module "carshub_db_credentials" {
 module "flow_logs_role" {
   source             = "../../../modules/iam"
   role_name          = "carshub-flow-logs-role-${var.env}-${var.region}"
-  role_description   = "carshub-flow-logs-role-${var.env}-${var.region}"
+  role_description   = "IAM role for VPC Flow Logs"
   policy_name        = "carshub-flow-logs-policy-${var.env}-${var.region}"
-  policy_description = "carshub-flow-logs-policy-${var.env}-${var.region}"
+  policy_description = "IAM policy for VPC Flow Logs"
   assume_role_policy = <<EOF
     {
         "Version": "2012-10-17",
@@ -239,15 +240,16 @@ module "flow_logs_role" {
     EOF
 }
 
-resource "aws_cloudwatch_log_group" "carshub_flow_log_group" {
-  name              = "/carshub/application/${var.env}-${var.region}"
+module "carshub_flow_log_group" {
+  source            = "../../../modules/cloudwatch/cloudwatch-log-group"
+  log_group_name    = "/carshub/application/${var.env}-${var.region}"
   retention_in_days = 365
 }
 
 # Add VPC Flow Logs for security monitoring
 resource "aws_flow_log" "carshub_vpc_flow_log" {
   iam_role_arn    = module.flow_logs_role.arn
-  log_destination = aws_cloudwatch_log_group.carshub_flow_log_group.arn
+  log_destination = module.carshub_flow_log_group.arn
   traffic_type    = "ALL"
   vpc_id          = module.carshub_vpc.vpc_id
 }
@@ -257,7 +259,6 @@ resource "aws_flow_log" "carshub_vpc_flow_log" {
 # -----------------------------------------------------------------------------------------
 resource "aws_iam_role" "rds_monitoring_role" {
   name = "carshub-rds-monitoring-role-${var.env}-${var.region}"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -537,9 +538,9 @@ module "carshub_media_events_queue" {
 module "carshub_media_update_function_iam_role" {
   source             = "../../../modules/iam"
   role_name          = "carshub-media-update-function-iam-role-${var.env}-${var.region}"
-  role_description   = "carshub-media-update-function-iam-role-${var.env}-${var.region}"
+  role_description   = "IAM role for media metadata update lambda function"
   policy_name        = "carshub-media-update-function-iam-policy-${var.env}-${var.region}"
-  policy_description = "carshub-media-update-function-iam-policy-${var.env}-${var.region}"
+  policy_description = "IAM policy for media metadata update lambda function"
   assume_role_policy = <<EOF
     {
         "Version": "2012-10-17",
@@ -661,9 +662,9 @@ module "carshub_media_cloudfront_distribution" {
 module "iam_instance_profile_role" {
   source             = "../../../modules/iam"
   role_name          = "iam-instance-profile-role-${var.env}-${var.region}"
-  role_description   = "iam-instance-profile-role-${var.env}-${var.region}"
+  role_description   = "Instance Profile Role for EC2 Instances"
   policy_name        = "iam-instance-profile-policy-${var.env}-${var.region}"
-  policy_description = "iam-instance-profile-policy-${var.env}-${var.region}"
+  policy_description = "IAM policy for EC2 instance profile"
   assume_role_policy = <<EOF
     {
         "Version": "2012-10-17",
