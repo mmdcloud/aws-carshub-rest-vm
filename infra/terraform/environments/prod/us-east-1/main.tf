@@ -278,37 +278,64 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
 
+# Uncomment only if KMS is needed
+
+# module "carshub_kms_rds" {
+#   source = "../../../modules/kms"
+#   name = "carshub-kms-rds-${var.env}-${var.region}"
+#   description             = "KMS key for ECR encryption"
+#   deletion_window_in_days = 30
+#   enable_key_rotation     = true
+# }
+
 module "carshub_db" {
-  source                          = "../../../modules/rds"
-  db_name                         = "carshubdb${var.env}useast1"
-  allocated_storage               = 100
-  storage_type                    = "gp3"
-  engine                          = "mysql"
-  engine_version                  = "8.0.40"
-  instance_class                  = "db.r6g.large"
-  multi_az                        = true
-  username                        = tostring(data.vault_generic_secret.rds.data["username"])
-  password                        = tostring(data.vault_generic_secret.rds.data["password"])
-  subnet_group_name               = "carshub-rds-subnet-group-${var.env}-${var.region}"
-  enabled_cloudwatch_logs_exports = ["audit", "error", "general", "slowquery"]
-  backup_retention_period         = 35
-  backup_window                   = "03:00-06:00"
-  subnet_group_ids = [
-    module.carshub_vpc.private_subnets[0],
-    module.carshub_vpc.private_subnets[1],
-    module.carshub_vpc.private_subnets[2]
-  ]
-  vpc_security_group_ids                = [module.carshub_rds_sg.id]
-  publicly_accessible                   = false
-  deletion_protection                   = false
-  skip_final_snapshot                   = true
-  max_allocated_storage                 = 500
+  source     = "../../../modules/rds"
+  db_name    = "carshubdb${var.env}useast1"
+  identifier = "carshub-db-${var.env}"
+
+  allocated_storage     = 100
+  max_allocated_storage = 500
+  storage_type          = "gp3"
+  storage_encrypted     = true
+  # kms_key_id                            = module.carshub_kms_rds.arn 
+  iops               = 3000
+  storage_throughput = 125
+
+  engine                     = "mysql"
+  engine_version             = "8.0.40"
+  instance_class             = "db.r6g.large"
+  auto_minor_version_upgrade = true
+
+  deletion_protection = false
+
+  multi_az = true
+
+  username                            = tostring(data.vault_generic_secret.rds.data["username"])
+  password                            = tostring(data.vault_generic_secret.rds.data["password"])
+  iam_database_authentication_enabled = true
+
+  subnet_group_name      = "carshub-rds-subnet-group-${var.env}-${var.region}"
+  subnet_group_ids       = module.carshub_vpc.database_subnets
+  vpc_security_group_ids = [module.carshub_rds_sg.id]
+  publicly_accessible    = false
+
+  backup_retention_period   = 35
+  backup_window             = "03:00-06:00"
+  copy_tags_to_snapshot     = true
+  skip_final_snapshot       = true
+  final_snapshot_identifier = "carshub-db-final-snapshot-${var.env}-${timestamp()}"
+
+  maintenance_window = "sun:04:00-sun:05:00"
+
+  enabled_cloudwatch_logs_exports       = ["audit", "error", "general", "slowquery"]
   performance_insights_enabled          = true
   performance_insights_retention_period = 7
   monitoring_interval                   = 60
-  monitoring_role_arn                   = aws_iam_role.rds_monitoring_role.arn
-  parameter_group_name                  = "carshub-db-pg-${var.env}-${var.region}"
-  parameter_group_family                = "mysql8.0"
+  # performance_insights_kms_key_id       = module.carshub_kms_rds.arn
+  monitoring_role_arn = aws_iam_role.rds_monitoring_role.arn
+
+  parameter_group_name   = "carshub-db-pg-${var.env}-${var.region}"
+  parameter_group_family = "mysql8.0"
   parameters = [
     {
       name  = "max_connections"
@@ -321,8 +348,52 @@ module "carshub_db" {
     {
       name  = "slow_query_log"
       value = "1"
+    },
+    {
+      name  = "long_query_time"
+      value = "2"
+    },
+    {
+      name  = "log_queries_not_using_indexes"
+      value = "1"
+    },
+    {
+      name  = "innodb_flush_log_at_trx_commit"
+      value = "1"
+    },
+    {
+      name  = "innodb_log_file_size"
+      value = "512M"
+    },
+    {
+      name  = "max_allowed_packet"
+      value = "67108864"
+    },
+    {
+      name  = "character_set_server"
+      value = "utf8mb4"
+    },
+    {
+      name  = "collation_server"
+      value = "utf8mb4_unicode_ci"
+    },
+    {
+      name  = "query_cache_type"
+      value = "0"
+    },
+    {
+      name  = "tmp_table_size"
+      value = "67108864"
+    },
+    {
+      name  = "max_heap_table_size"
+      value = "67108864"
     }
   ]
+  tags = {
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -376,8 +447,6 @@ module "carshub_media_bucket" {
       }
     ]
   })
-  # Note: Lifecycle policies should be configured in the S3 module
-  # or as separate aws_s3_bucket_lifecycle_configuration resources
   force_destroy = true
   bucket_notification = {
     queue = [
