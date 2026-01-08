@@ -36,18 +36,20 @@ module "carshub_frontend_lb_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description = "HTTP Frontend Traffic"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
+      description     = "HTTP Frontend Traffic"
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      security_groups = []
+      cidr_blocks     = ["0.0.0.0/0"]
     },
     {
-      description = "HTTPS Frontend Traffic"
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
+      description     = "HTTPS Frontend Traffic"
+      from_port       = 443
+      to_port         = 443
+      protocol        = "tcp"
+      security_groups = []
+      cidr_blocks     = ["0.0.0.0/0"]
     }
   ]
   egress_rules = [
@@ -70,18 +72,20 @@ module "carshub_backend_lb_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description = "HTTP Backend Traffic"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
+      description     = "HTTP Backend Traffic"
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      security_groups = [module.carshub_frontend_lb_sg.id]
+      cidr_blocks     = []
     },
     {
-      description = "HTTPS Backend Traffic"
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
+      description     = "HTTPS Backend Traffic"
+      from_port       = 443
+      to_port         = 443
+      protocol        = "tcp"
+      security_groups = [module.carshub_frontend_lb_sg.id]
+      cidr_blocks     = []
     }
   ]
   egress_rules = [
@@ -243,6 +247,7 @@ module "flow_logs_role" {
 module "carshub_flow_log_group" {
   source            = "../../../modules/cloudwatch/cloudwatch-log-group"
   log_group_name    = "/carshub/application/${var.env}-${var.region}"
+  skip_destroy      = false
   retention_in_days = 365
 }
 
@@ -298,8 +303,8 @@ module "carshub_db" {
   storage_type          = "gp3"
   storage_encrypted     = true
   # kms_key_id                            = module.carshub_kms_rds.arn 
-  iops               = 3000
-  storage_throughput = 125
+  # iops               = 3000
+  # storage_throughput = 125
 
   engine                     = "mysql"
   engine_version             = "8.0.40"
@@ -323,9 +328,9 @@ module "carshub_db" {
   backup_window             = "03:00-06:00"
   copy_tags_to_snapshot     = true
   skip_final_snapshot       = true
-  final_snapshot_identifier = "carshub-db-final-snapshot-${var.env}-${timestamp()}"
+  final_snapshot_identifier = "carshub-db-final-snapshot-${var.env}"
 
-  maintenance_window = "sun:04:00-sun:05:00"
+  maintenance_window = "sun:08:00-sun:10:00"
 
   enabled_cloudwatch_logs_exports       = ["audit", "error", "general", "slowquery"]
   performance_insights_enabled          = true
@@ -341,54 +346,50 @@ module "carshub_db" {
       name  = "max_connections"
       value = "1000"
     },
-    {
-      name  = "innodb_buffer_pool_size"
-      value = "{DBInstanceClassMemory*3/4}"
-    },
+    # {
+    #   name  = "innodb_buffer_pool_size"
+    #   value = "{DBInstanceClassMemory*3/4}"
+    # },
     {
       name  = "slow_query_log"
       value = "1"
     },
-    {
-      name  = "long_query_time"
-      value = "2"
-    },
-    {
-      name  = "log_queries_not_using_indexes"
-      value = "1"
-    },
-    {
-      name  = "innodb_flush_log_at_trx_commit"
-      value = "1"
-    },
-    {
-      name  = "innodb_log_file_size"
-      value = "512M"
-    },
-    {
-      name  = "max_allowed_packet"
-      value = "67108864"
-    },
-    {
-      name  = "character_set_server"
-      value = "utf8mb4"
-    },
-    {
-      name  = "collation_server"
-      value = "utf8mb4_unicode_ci"
-    },
-    {
-      name  = "query_cache_type"
-      value = "0"
-    },
-    {
-      name  = "tmp_table_size"
-      value = "67108864"
-    },
-    {
-      name  = "max_heap_table_size"
-      value = "67108864"
-    }
+    # {
+    #   name  = "long_query_time"
+    #   value = "2"
+    # },
+    # {
+    #   name  = "log_queries_not_using_indexes"
+    #   value = "1"
+    # },
+    # {
+    #   name  = "innodb_flush_log_at_trx_commit"
+    #   value = "1"
+    # },
+    # {
+    #   name  = "innodb_log_file_size"
+    #   value = "536870912"
+    # },
+    # {
+    #   name  = "max_allowed_packet"
+    #   value = "67108864"
+    # },
+    # {
+    #   name  = "character_set_server"
+    #   value = "utf8mb4"
+    # },
+    # {
+    #   name  = "collation_server"
+    #   value = "utf8mb4_unicode_ci"
+    # },
+    # {
+    #   name  = "tmp_table_size"
+    #   value = "67108864"
+    # },
+    # {
+    #   name  = "max_heap_table_size"
+    #   value = "67108864"
+    # }
   ]
   tags = {
     Environment = "${var.env}"
@@ -482,10 +483,41 @@ module "carshub_media_update_function_code" {
 }
 
 module "carshub_frontend_lb_logs" {
-  source        = "./modules/s3"
-  bucket_name   = "carshub-frontend-lb-logs-${var.env}-${var.region}"
-  objects       = []
-  bucket_policy = ""
+  source      = "./modules/s3"
+  bucket_name = "carshub-frontend-lb-logs-${var.env}-${var.region}"
+  objects     = []
+  bucket_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AWSLogDeliveryWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "logging.s3.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "arn:aws:s3:::carshub-frontend-lb-logs-${var.env}-${var.region}/*"
+      },
+      {
+        Sid    = "AWSLogDeliveryAclCheck"
+        Effect = "Allow"
+        Principal = {
+          Service = "logging.s3.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = "arn:aws:s3:::carshub-frontend-lb-logs-${var.env}-${var.region}"
+      },
+      {
+        Sid    = "AWSELBAccountWrite"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_elb_service_account.main.id}:root"
+        }
+        Action   = "s3:PutObject"
+        Resource = "arn:aws:s3:::carshub-frontend-lb-logs-${var.env}-${var.region}/*"
+      }
+    ]
+  })
   cors = [
     {
       allowed_headers = ["*"]
@@ -505,10 +537,41 @@ module "carshub_frontend_lb_logs" {
 }
 
 module "carshub_backend_lb_logs" {
-  source        = "./modules/s3"
-  bucket_name   = "carshub-backend-lb-logs-${var.env}-${var.region}"
-  objects       = []
-  bucket_policy = ""
+  source      = "./modules/s3"
+  bucket_name = "carshub-backend-lb-logs-${var.env}-${var.region}"
+  objects     = []
+  bucket_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AWSLogDeliveryWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "logging.s3.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "arn:aws:s3:::carshub-backend-lb-logs-${var.env}-${var.region}/*"
+      },
+      {
+        Sid    = "AWSLogDeliveryAclCheck"
+        Effect = "Allow"
+        Principal = {
+          Service = "logging.s3.amazonaws.com"
+        }
+        Action   = "s3:GetBucketAcl"
+        Resource = "arn:aws:s3:::carshub-backend-lb-logs-${var.env}-${var.region}"
+      },
+      {
+        Sid    = "AWSELBAccountWrite"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_elb_service_account.main.id}:root"
+        }
+        Action   = "s3:PutObject"
+        Resource = "arn:aws:s3:::carshub-backend-lb-logs-${var.env}-${var.region}/*"
+      }
+    ]
+  })
   cors = [
     {
       allowed_headers = ["*"]
