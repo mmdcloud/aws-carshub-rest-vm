@@ -5,6 +5,8 @@ data "vault_generic_secret" "rds" {
 
 data "aws_caller_identity" "current" {}
 
+data "aws_elb_service_account" "main" {}
+
 # -----------------------------------------------------------------------------------------
 # VPC Configuration
 # -----------------------------------------------------------------------------------------
@@ -25,7 +27,7 @@ module "carshub_vpc" {
   one_nat_gateway_per_az  = true
   tags = {
     Environment = "${var.env}"
-    Project     = "carshub"
+    Project     = var.project
   }
 }
 
@@ -63,6 +65,7 @@ module "carshub_frontend_lb_sg" {
   ]
   tags = {
     Name = "carshub-frontend-lb-sg-${var.env}-${var.region}"
+    Project     = var.project
   }
 }
 
@@ -99,6 +102,7 @@ module "carshub_backend_lb_sg" {
   ]
   tags = {
     Name = "carshub-backend-lb-sg-${var.env}-${var.region}"
+    Project     = var.project
   }
 }
 
@@ -127,6 +131,7 @@ module "carshub_asg_frontend_sg" {
   ]
   tags = {
     Name = "carshub-asg-frontend-sg-${var.env}-${var.region}"
+    Project     = var.project
   }
 }
 
@@ -155,6 +160,7 @@ module "carshub_asg_backend_sg" {
   ]
   tags = {
     Name = "carshub-asg-backend-sg-${var.env}-${var.region}"
+    Project     = var.project
   }
 }
 
@@ -183,6 +189,7 @@ module "carshub_rds_sg" {
   ]
   tags = {
     Name = "carshub-rds-sg-${var.env}-${var.region}"
+    Project     = var.project
   }
 }
 
@@ -925,7 +932,7 @@ module "carshub_frontend_lb" {
   enable_deletion_protection = false
   drop_invalid_header_fields = true
   ip_address_type            = "ipv4"
-  internal                   = false
+  internal                   = true
   security_groups = [
     module.frontend_lb_sg.id
   ]
