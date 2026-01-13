@@ -21,3 +21,14 @@ variable "permissions" {
     source_arn = string
   }))
 }
+variable "vpc_config" {
+  type = object({
+    security_group_ids = set(string)
+    subnet_ids         = set(string)
+  })
+}
+variable "dead_letter_config" {
+  type = object({
+    target_arn = string
+  })
+}

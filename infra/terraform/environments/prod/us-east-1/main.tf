@@ -64,8 +64,8 @@ module "carshub_frontend_lb_sg" {
     }
   ]
   tags = {
-    Name = "carshub-frontend-lb-sg-${var.env}-${var.region}"
-    Project     = var.project
+    Name    = "carshub-frontend-lb-sg-${var.env}-${var.region}"
+    Project = var.project
   }
 }
 
@@ -101,8 +101,8 @@ module "carshub_backend_lb_sg" {
     }
   ]
   tags = {
-    Name = "carshub-backend-lb-sg-${var.env}-${var.region}"
-    Project     = var.project
+    Name    = "carshub-backend-lb-sg-${var.env}-${var.region}"
+    Project = var.project
   }
 }
 
@@ -130,8 +130,8 @@ module "carshub_asg_frontend_sg" {
     }
   ]
   tags = {
-    Name = "carshub-asg-frontend-sg-${var.env}-${var.region}"
-    Project     = var.project
+    Name    = "carshub-asg-frontend-sg-${var.env}-${var.region}"
+    Project = var.project
   }
 }
 
@@ -159,8 +159,48 @@ module "carshub_asg_backend_sg" {
     }
   ]
   tags = {
-    Name = "carshub-asg-backend-sg-${var.env}-${var.region}"
-    Project     = var.project
+    Name    = "carshub-asg-backend-sg-${var.env}-${var.region}"
+    Project = var.project
+  }
+}
+
+module "carshub_lambda_sg" {
+  source = "../../../modules/security-groups"
+  name   = "carshub-lambda-sg-${var.env}-${var.region}"
+  vpc_id = module.carshub_vpc.vpc_id
+
+  ingress_rules = []
+
+  egress_rules = [
+    {
+      description     = "MySQL to RDS"
+      from_port       = 3306
+      to_port         = 3306
+      protocol        = "tcp"
+      cidr_blocks     = []
+      security_groups = [module.carshub_rds_sg.id]
+    },
+    {
+      description     = "HTTPS to S3"
+      from_port       = 443
+      to_port         = 443
+      protocol        = "tcp"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+    },
+    {
+      description     = "HTTPS to Secrets Manager"
+      from_port       = 443
+      to_port         = 443
+      protocol        = "tcp"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+    }
+  ]
+
+  tags = {
+    Name    = "carshub-lambda-sg-${var.env}-${var.region}"
+    Project = var.project
   }
 }
 
@@ -188,8 +228,8 @@ module "carshub_rds_sg" {
     }
   ]
   tags = {
-    Name = "carshub-rds-sg-${var.env}-${var.region}"
-    Project     = var.project
+    Name    = "carshub-rds-sg-${var.env}-${var.region}"
+    Project = var.project
   }
 }
 
@@ -643,16 +683,14 @@ resource "aws_lambda_event_source_mapping" "sqs_event_trigger" {
 
 # SQS Queue for buffering S3 events
 module "carshub_media_events_queue" {
-  source                        = "../../../modules/sqs"
-  queue_name                    = "carshub-media-events-queue-${var.env}-${var.region}"
-  delay_seconds                 = 0
-  maxReceiveCount               = 3
-  dlq_message_retention_seconds = 86400
-  dlq_name                      = "carshub-media-events-dlq-${var.env}-${var.region}"
-  max_message_size              = 262144
-  message_retention_seconds     = 345600
-  visibility_timeout_seconds    = 180
-  receive_wait_time_seconds     = 20
+  source                     = "../../../modules/sqs"
+  queue_name                 = "carshub-media-events-queue-${var.env}-${var.region}"
+  delay_seconds              = 0
+  maxReceiveCount            = 3
+  max_message_size           = 262144
+  message_retention_seconds  = 345600
+  visibility_timeout_seconds = 180
+  receive_wait_time_seconds  = 20
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -669,6 +707,18 @@ module "carshub_media_events_queue" {
       }
     ]
   })
+}
+
+module "carshub_media_events_dlq" {
+  source                     = "../../../modules/sqs"
+  queue_name                 = "carshub-media-events-dlq-${var.env}-${var.region}"
+  delay_seconds              = 0
+  maxReceiveCount            = 3
+  max_message_size           = 262144
+  message_retention_seconds  = 345600
+  visibility_timeout_seconds = 180
+  receive_wait_time_seconds  = 20
+  policy                     = ""
 }
 
 # -----------------------------------------------------------------------------------------
@@ -745,6 +795,13 @@ module "carshub_media_update_function" {
   function_name = "carshub-media-update-${var.env}-${var.region}"
   role_arn      = module.carshub_media_update_function_iam_role.arn
   permissions   = []
+  vpc_config = {
+    security_group_ids = [module.carshub_lambda_sg.id]
+    subnet_ids         = module.carshub_vpc.private_subnets
+  }
+  dead_letter_config = {
+    target_arn = module.carshub_media_events_dlq.arn
+  }
   env_variables = {
     SECRET_NAME = module.carshub_db_credentials.name
     DB_HOST     = tostring(split(":", module.carshub_db.endpoint)[0])
