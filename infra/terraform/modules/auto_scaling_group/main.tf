@@ -13,3 +13,4 @@ resource "aws_autoscaling_group" "asg" {
     version = var.launch_template_version
   }
 }
+

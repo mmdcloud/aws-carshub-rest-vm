@@ -26,6 +26,7 @@ module "carshub_vpc" {
   single_nat_gateway      = false
   one_nat_gateway_per_az  = true
   tags = {
+    Name        = "carshub-vpc-${var.env}-${var.region}"
     Environment = "${var.env}"
     Project     = var.project
   }
@@ -187,14 +188,6 @@ module "carshub_lambda_sg" {
       protocol        = "tcp"
       cidr_blocks     = ["0.0.0.0/0"]
       security_groups = []
-    },
-    {
-      description     = "HTTPS to Secrets Manager"
-      from_port       = 443
-      to_port         = 443
-      protocol        = "tcp"
-      cidr_blocks     = ["0.0.0.0/0"]
-      security_groups = []
     }
   ]
 
@@ -238,13 +231,16 @@ module "carshub_rds_sg" {
 # -----------------------------------------------------------------------------------------
 module "carshub_db_credentials" {
   source                  = "../../../modules/secrets-manager"
-  name                    = "carshub-rds-secrets-${var.env}-${var.region}"
+  name                    = "carshub-rds-secret-${var.env}-${var.region}"
   description             = "Secret for storing RDS credentials"
   recovery_window_in_days = 0
   secret_string = jsonencode({
     username = tostring(data.vault_generic_secret.rds.data["username"])
     password = tostring(data.vault_generic_secret.rds.data["password"])
   })
+  tags = {
+    Environment = "${var.env}"
+  }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -293,7 +289,7 @@ module "flow_logs_role" {
 
 module "carshub_flow_log_group" {
   source            = "../../../modules/cloudwatch/cloudwatch-log-group"
-  log_group_name    = "/carshub/application/${var.env}-${var.region}"
+  log_group_name    = "/aws/vpc/flow-logs/carshub-application-${var.env}-${var.region}"
   skip_destroy      = false
   retention_in_days = 365
 }
@@ -469,7 +465,7 @@ module "carshub_media_bucket" {
       max_age_seconds = 3000
     },
     {
-      allowed_headers = ["${module.carshub_frontend_lb.lb_dns_name}"]
+      allowed_headers = ["${module.carshub_frontend_lb.dns_name}"]
       allowed_methods = ["PUT"]
       allowed_origins = ["*"]
       max_age_seconds = 3000
@@ -530,7 +526,7 @@ module "carshub_media_update_function_code" {
 }
 
 module "carshub_frontend_lb_logs" {
-  source      = "./modules/s3"
+  source      = "../../../modules/s3"
   bucket_name = "carshub-frontend-lb-logs-${var.env}-${var.region}"
   objects     = []
   bucket_policy = jsonencode({
@@ -584,7 +580,7 @@ module "carshub_frontend_lb_logs" {
 }
 
 module "carshub_backend_lb_logs" {
-  source      = "./modules/s3"
+  source      = "../../../modules/s3"
   bucket_name = "carshub-backend-lb-logs-${var.env}-${var.region}"
   objects     = []
   bucket_policy = jsonencode({
@@ -776,6 +772,22 @@ module "carshub_media_update_function_iam_role" {
               ],
               "Effect"   : "Allow",
               "Resource" : "${module.carshub_media_events_queue.arn}"
+            },
+            {
+              "Action": [
+                "sqs:*"
+              ],
+              "Effect"   : "Allow",
+              "Resource" : "${module.carshub_media_events_dlq.arn}"
+            },
+            {
+              "Action": [
+                "ec2:CreateNetworkInterface",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DeleteNetworkInterface"
+              ],
+              "Effect"   : "Allow",
+              "Resource" : "*"
             }
         ]
     }
@@ -915,7 +927,7 @@ module "carshub_frontend_launch_template" {
     }
   ]
   user_data = base64encode(templatefile("${path.module}/../../../scripts/user_data_frontend.sh", {
-    BASE_URL = "http://${module.carshub_backend_lb.lb_dns_name}"
+    BASE_URL = "http://${module.carshub_backend_lb.dns_name}"
     CDN_URL  = module.carshub_media_cloudfront_distribution.domain_name
   }))
 }
@@ -955,7 +967,7 @@ module "carshub_frontend_asg" {
   health_check_grace_period = 300
   health_check_type         = "ELB"
   force_delete              = true
-  target_group_arns         = [module.carshub_frontend_lb.target_groups[0].arn]
+  target_group_arns         = [module.carshub_frontend_lb.target_groups["carshub_frontend_lb_target_group"].arn]
   vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_frontend_launch_template.id
   launch_template_version   = "$Latest"
@@ -971,7 +983,7 @@ module "carshub_backend_asg" {
   health_check_grace_period = 300
   health_check_type         = "ELB"
   force_delete              = true
-  target_group_arns         = [module.carshub_backend_lb.target_groups[0].arn]
+  target_group_arns         = [module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn]
   vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_backend_launch_template.id
   launch_template_version   = "$Latest"
@@ -982,16 +994,16 @@ module "carshub_backend_asg" {
 # -----------------------------------------------------------------------------------------
 module "carshub_frontend_lb" {
   source                     = "terraform-aws-modules/alb/aws"
-  name                       = "carshub-frontend-lb-${var.env}-${var.region}"
+  name                       = "frontend-lb-${var.env}-${var.region}"
   load_balancer_type         = "application"
   vpc_id                     = module.carshub_vpc.vpc_id
   subnets                    = module.carshub_vpc.public_subnets
   enable_deletion_protection = false
   drop_invalid_header_fields = true
   ip_address_type            = "ipv4"
-  internal                   = true
+  internal                   = false
   security_groups = [
-    module.frontend_lb_sg.id
+    module.carshub_frontend_lb_sg.id
   ]
   access_logs = {
     bucket = "${module.carshub_frontend_lb_logs.bucket}"
@@ -1009,7 +1021,7 @@ module "carshub_frontend_lb" {
     carshub_frontend_lb_target_group = {
       backend_protocol = "HTTP"
       backend_port     = 3000
-      target_type      = "ip"
+      target_type      = "instance"
       health_check = {
         enabled             = true
         healthy_threshold   = 3
@@ -1029,7 +1041,7 @@ module "carshub_frontend_lb" {
 
 module "carshub_backend_lb" {
   source                     = "terraform-aws-modules/alb/aws"
-  name                       = "carshub-backend-lb-${var.env}-${var.region}"
+  name                       = "backend-lb-${var.env}-${var.region}"
   load_balancer_type         = "application"
   vpc_id                     = module.carshub_vpc.vpc_id
   subnets                    = module.carshub_vpc.public_subnets
@@ -1038,7 +1050,7 @@ module "carshub_backend_lb" {
   ip_address_type            = "ipv4"
   internal                   = false
   security_groups = [
-    module.backend_lb_sg.id
+    module.carshub_backend_lb_sg.id
   ]
   access_logs = {
     bucket = "${module.carshub_backend_lb_logs.bucket}"
@@ -1056,7 +1068,7 @@ module "carshub_backend_lb" {
     carshub_backend_lb_target_group = {
       backend_protocol = "HTTP"
       backend_port     = 80
-      target_type      = "ip"
+      target_type      = "instance"
       health_check = {
         enabled             = true
         healthy_threshold   = 3
@@ -1189,7 +1201,7 @@ module "carshub_frontend_alb_high_response_time" {
   ok_actions          = [module.carshub_alarm_notifications.topic_arn]
 
   dimensions = {
-    TargetGroup  = module.carshub_frontend_lb.target_groups[0].arn
+    TargetGroup  = module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn
     LoadBalancer = "${module.carshub_frontend_lb.arn}"
   }
 }
@@ -1210,7 +1222,7 @@ module "carshub_frontend_lb_high_5xx_errors" {
   ok_actions          = [module.carshub_alarm_notifications.topic_arn]
 
   dimensions = {
-    TargetGroup  = module.carshub_frontend_lb.target_groups[0].arn
+    TargetGroup  = module.carshub_frontend_lb.target_groups["carshub_frontend_lb_target_group"].arn
     LoadBalancer = "${module.carshub_frontend_lb.arn}"
   }
 }
@@ -1234,7 +1246,7 @@ module "carshub_backend_lb_high_response_time" {
   ok_actions          = [module.carshub_alarm_notifications.topic_arn]
 
   dimensions = {
-    TargetGroup  = module.carshub_backend_lb.target_groups[0].arn
+    TargetGroup  = module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn
     LoadBalancer = "${module.carshub_backend_lb.arn}"
   }
 }
@@ -1255,7 +1267,7 @@ module "carshub_backend_lb_high_5xx_errors" {
   ok_actions          = [module.carshub_alarm_notifications.topic_arn]
 
   dimensions = {
-    TargetGroup  = module.carshub_backend_lb.target_groups[0].arn
+    TargetGroup  = module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn
     LoadBalancer = "${module.carshub_backend_lb.arn}"
   }
 }

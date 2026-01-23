@@ -1,21 +1,21 @@
 variable "region" {
-  type    = string
+  type = string
 }
 
 variable "db_name" {
-  type    = string
+  type = string
 }
 
 variable "env" {
-  type    = string
+  type = string
 }
 
 variable "project" {
-  type    = string
+  type = string
 }
 
 variable "vehicle-images-code-version" {
-  type    = string
+  type = string
 }
 
 variable "public_subnets" {
