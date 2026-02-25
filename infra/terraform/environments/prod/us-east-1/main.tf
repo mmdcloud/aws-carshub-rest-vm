@@ -1363,3 +1363,28 @@ module "rds_high_connections" {
     DBInstanceIdentifier = module.carshub_db.name
   }
 }
+
+# -----------------------------------------------------------------------------------------
+# Resource Group Configuration
+# -----------------------------------------------------------------------------------------
+resource "aws_resourcegroups_group" "carshub_resource_group" {
+  name = "carshub-resource-group-${var.env}"
+
+  resource_query {
+    query = <<JSON
+{
+  "ResourceTypeFilters": "*,
+  "TagFilters": [
+    {
+      "Key": "Project",
+      "Values": ["${var.project}"]
+    },
+    {
+      "Key": "Env",
+      "Values": ["${var.env}"]
+    }
+  ]
+}
+JSON
+  }
+}

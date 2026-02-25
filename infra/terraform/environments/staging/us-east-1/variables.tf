@@ -1,17 +1,21 @@
 variable "region" {
-  type    = string
+  type = string
 }
 
 variable "db_name" {
-  type    = string
+  type = string
 }
 
 variable "env" {
-  type    = string
+  type = string
+}
+
+variable "project" {
+  type = string
 }
 
 variable "vehicle-images-code-version" {
-  type    = string
+  type = string
 }
 
 variable "public_subnets" {
@@ -22,6 +26,11 @@ variable "public_subnets" {
 variable "private_subnets" {
   type        = list(string)
   description = "Private Subnet CIDR values"
+}
+
+variable "database_subnets" {
+  type        = list(string)
+  description = "Database Subnet CIDR values"
 }
 
 variable "azs" {
