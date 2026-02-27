@@ -1373,7 +1373,7 @@ resource "aws_resourcegroups_group" "carshub_resource_group" {
   resource_query {
     query = <<JSON
 {
-  "ResourceTypeFilters": "*,
+  "ResourceTypeFilters": ["AWS::AllSupported"],
   "TagFilters": [
     {
       "Key": "Project",
