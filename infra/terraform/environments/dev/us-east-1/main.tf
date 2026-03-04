@@ -80,7 +80,7 @@ module "carshub_backend_lb_sg" {
       from_port       = 80
       to_port         = 80
       protocol        = "tcp"
-      security_groups = [module.carshub_frontend_lb_sg.id]
+      security_groups = [module.carshub_frontend_lb_sg.id,module.carshub_asg_frontend_sg.id]
       cidr_blocks     = []
     },
     {
@@ -88,7 +88,7 @@ module "carshub_backend_lb_sg" {
       from_port       = 443
       to_port         = 443
       protocol        = "tcp"
-      security_groups = [module.carshub_frontend_lb_sg.id]
+      security_groups = [module.carshub_frontend_lb_sg.id,module.carshub_asg_frontend_sg.id]
       cidr_blocks     = []
     }
   ]
@@ -922,7 +922,7 @@ module "carshub_frontend_launch_template" {
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = true
+      associate_public_ip_address = false
       security_groups             = [module.carshub_asg_frontend_sg.id]
     }
   ]
@@ -945,7 +945,7 @@ module "carshub_backend_launch_template" {
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = true
+      associate_public_ip_address = false
       security_groups             = [module.carshub_asg_backend_sg.id]
     }
   ]
@@ -964,7 +964,7 @@ module "carshub_frontend_asg" {
   min_size                  = 3
   max_size                  = 50
   desired_capacity          = 3
-  health_check_grace_period = 300
+  health_check_grace_period = 600
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups["carshub_frontend_lb_target_group"].arn]
@@ -980,7 +980,7 @@ module "carshub_backend_asg" {
   min_size                  = 3
   max_size                  = 50
   desired_capacity          = 3
-  health_check_grace_period = 300
+  health_check_grace_period = 600
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn]
@@ -1026,6 +1026,7 @@ module "carshub_frontend_lb" {
         enabled             = true
         healthy_threshold   = 3
         interval            = 30
+        timeout             = 10
         path                = "/auth/signin"
         port                = 3000
         protocol            = "HTTP"
@@ -1073,6 +1074,7 @@ module "carshub_backend_lb" {
         enabled             = true
         healthy_threshold   = 3
         interval            = 30
+        timeout             = 10
         path                = "/"
         port                = 80
         protocol            = "HTTP"

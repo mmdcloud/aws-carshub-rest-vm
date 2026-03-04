@@ -922,7 +922,7 @@ module "carshub_frontend_launch_template" {
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = true
+      associate_public_ip_address = false
       security_groups             = [module.carshub_asg_frontend_sg.id]
     }
   ]
@@ -945,7 +945,7 @@ module "carshub_backend_launch_template" {
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = true
+      associate_public_ip_address = false
       security_groups             = [module.carshub_asg_backend_sg.id]
     }
   ]

@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+exec > /var/log/user-data.log 2>&1
 sudo apt-get update -y
 sudo apt-get upgrade -y
 # Installing Nginx
@@ -34,13 +36,13 @@ pm2 start ecosystem.config.js
 sudo service nginx restart
 
 # Installing AWS CloudWatch Agent
-sudo apt-get update
-sudo apt-get install -y wget curl unzip
-wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-sudo dpkg -i amazon-cloudwatch-agent.deb
-sudo apt-get install -f
-sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
-sudo systemctl enable amazon-cloudwatch-agent
-sudo systemctl start amazon-cloudwatch-agent
-sudo systemctl status amazon-cloudwatch-agent
-echo "CloudWatch agent installation completed"
+# sudo apt-get update
+# sudo apt-get install -y wget curl unzip
+# wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+# sudo dpkg -i amazon-cloudwatch-agent.deb
+# sudo apt-get install -f
+# sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
+# sudo systemctl enable amazon-cloudwatch-agent
+# sudo systemctl start amazon-cloudwatch-agent
+# sudo systemctl status amazon-cloudwatch-agent
+# echo "CloudWatch agent installation completed"
