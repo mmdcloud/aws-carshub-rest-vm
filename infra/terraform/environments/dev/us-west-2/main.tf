@@ -65,8 +65,9 @@ module "carshub_frontend_lb_sg" {
     }
   ]
   tags = {
-    Name    = "carshub-frontend-lb-sg-${var.env}-${var.region}"
-    Project = var.project
+    Name        = "carshub-frontend-lb-sg-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -102,8 +103,9 @@ module "carshub_backend_lb_sg" {
     }
   ]
   tags = {
-    Name    = "carshub-backend-lb-sg-${var.env}-${var.region}"
-    Project = var.project
+    Name        = "carshub-backend-lb-sg-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -131,8 +133,9 @@ module "carshub_asg_frontend_sg" {
     }
   ]
   tags = {
-    Name    = "carshub-asg-frontend-sg-${var.env}-${var.region}"
-    Project = var.project
+    Name        = "carshub-asg-frontend-sg-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -160,8 +163,39 @@ module "carshub_asg_backend_sg" {
     }
   ]
   tags = {
-    Name    = "carshub-asg-backend-sg-${var.env}-${var.region}"
-    Project = var.project
+    Name        = "carshub-asg-backend-sg-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
+}
+
+module "carshub_rds_sg" {
+  source = "../../../modules/security-groups"
+  name   = "carshub-rds-sg-${var.env}-${var.region}"
+  vpc_id = module.carshub_vpc.vpc_id
+  ingress_rules = [
+    {
+      description     = "RDS Traffic"
+      from_port       = 3306
+      to_port         = 3306
+      protocol        = "tcp"
+      security_groups = [module.carshub_asg_backend_sg.id]
+      cidr_blocks     = []
+    }
+  ]
+  egress_rules = [
+    {
+      description = "Allow all outbound traffic"
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+  tags = {
+    Name        = "carshub-rds-sg-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -192,37 +226,9 @@ module "carshub_lambda_sg" {
   ]
 
   tags = {
-    Name    = "carshub-lambda-sg-${var.env}-${var.region}"
-    Project = var.project
-  }
-}
-
-module "carshub_rds_sg" {
-  source = "../../../modules/security-groups"
-  name   = "carshub-rds-sg-${var.env}-${var.region}"
-  vpc_id = module.carshub_vpc.vpc_id
-  ingress_rules = [
-    {
-      description     = "RDS Traffic"
-      from_port       = 3306
-      to_port         = 3306
-      protocol        = "tcp"
-      security_groups = [module.carshub_asg_backend_sg.id]
-      cidr_blocks     = []
-    }
-  ]
-  egress_rules = [
-    {
-      description = "Allow all outbound traffic"
-      from_port   = 0
-      to_port     = 0
-      protocol    = "-1"
-      cidr_blocks = ["0.0.0.0/0"]
-    }
-  ]
-  tags = {
-    Name    = "carshub-rds-sg-${var.env}-${var.region}"
-    Project = var.project
+    Name        = "carshub-lambda-sg-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -239,7 +245,9 @@ module "carshub_db_credentials" {
     password = tostring(data.vault_generic_secret.rds.data["password"])
   })
   tags = {
+    Name        = "carshub-rds-secret-${var.env}-${var.region}"
     Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -285,6 +293,11 @@ module "flow_logs_role" {
         ]
     }
     EOF
+  tags = {
+    Name        = "carshub-flow-logs-role-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 module "carshub_flow_log_group" {
@@ -435,6 +448,7 @@ module "carshub_db" {
     # }
   ]
   tags = {
+    Name        = "carshub-db-${var.env}"
     Environment = "${var.env}"
     Project     = var.project
   }
@@ -501,6 +515,11 @@ module "carshub_media_bucket" {
     ]
     lambda_function = []
   }
+  tags = {
+    Name        = "carshub-media-bucket${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 module "carshub_media_update_function_code" {
@@ -523,6 +542,11 @@ module "carshub_media_update_function_code" {
   ]
   versioning_enabled = "Enabled"
   force_destroy      = true
+  tags = {
+    Name        = "carshub-media-updatefunctioncode${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 module "carshub_frontend_lb_logs" {
@@ -577,6 +601,11 @@ module "carshub_frontend_lb_logs" {
   ]
   versioning_enabled = "Enabled"
   force_destroy      = true
+  tags = {
+    Name        = "carshub-frontend-lb-logs-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 module "carshub_backend_lb_logs" {
@@ -631,6 +660,11 @@ module "carshub_backend_lb_logs" {
   ]
   versioning_enabled = "Enabled"
   force_destroy      = true
+  tags = {
+    Name        = "carshub-backend-lb-logs-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -650,6 +684,11 @@ module "carshub_media_update_function_code_signed" {
       max_age_seconds = 3000
     }
   ]
+  tags = {
+    Name        = "carshub-media-update-function-code-signed${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # Signing profile
@@ -703,6 +742,11 @@ module "carshub_media_events_queue" {
       }
     ]
   })
+  tags = {
+    Name        = "carshub-media-events-queue-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 module "carshub_media_events_dlq" {
@@ -715,6 +759,11 @@ module "carshub_media_events_dlq" {
   visibility_timeout_seconds = 180
   receive_wait_time_seconds  = 20
   policy                     = ""
+  tags = {
+    Name        = "carshub-media-events-dlq-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -792,6 +841,11 @@ module "carshub_media_update_function_iam_role" {
         ]
     }
     EOF
+  tags = {
+    Name        = "carshub-media-update-function-iam-role-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # Lambda Layer for storing dependencies
@@ -826,6 +880,11 @@ module "carshub_media_update_function" {
   s3_key                  = "lambda.zip"
   layers                  = [aws_lambda_layer_version.python_layer.arn]
   code_signing_config_arn = module.carshub_signing_profile.config_arn
+  tags = {
+    Name        = "carshub-media-update-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -862,6 +921,11 @@ module "carshub_media_cloudfront_distribution" {
   cloudfront_default_certificate = true
   geo_restriction_type           = "none"
   query_string                   = true
+  tags = {
+    Name        = "carshub-media-cdn-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # -----------------------------------------------------------------------------------------
@@ -902,6 +966,11 @@ module "iam_instance_profile_role" {
         ]
     }
     EOF
+  tags = {
+    Name        = "iam-instance-profile-role-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 resource "aws_iam_instance_profile" "iam_instance_profile" {
@@ -922,7 +991,7 @@ module "carshub_frontend_launch_template" {
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = false
+      associate_public_ip_address = true
       security_groups             = [module.carshub_asg_frontend_sg.id]
     }
   ]
@@ -945,7 +1014,7 @@ module "carshub_backend_launch_template" {
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = false
+      associate_public_ip_address = true
       security_groups             = [module.carshub_asg_backend_sg.id]
     }
   ]
@@ -1035,7 +1104,9 @@ module "carshub_frontend_lb" {
     }
   }
   tags = {
-    Project = "carshub"
+    Name        = "frontend-lb-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -1082,7 +1153,9 @@ module "carshub_backend_lb" {
     }
   }
   tags = {
-    Project = "carshub"
+    Name        = "backend-lb-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
   }
 }
 
@@ -1175,13 +1248,18 @@ module "carshub_backend_lb" {
 # -----------------------------------------------------------------------------------------
 module "carshub_alarm_notifications" {
   source     = "../../../modules/sns"
-  topic_name = "carshub_cloudwatch_alarm_notification_topic"
+  topic_name = "carshub-cloudwatch-alarm-notification-topic-${var.env}-${var.region}"
   subscriptions = [
     {
       protocol = "email"
       endpoint = "madmaxcloudonline@gmail.com"
     }
   ]
+  tags = {
+    Name        = "carshub-cloudwatch-alarm-notification-topic-${var.env}-${var.region}"
+    Environment = "${var.env}"
+    Project     = var.project
+  }
 }
 
 # Target Response Time Alarm (if using ALB)
