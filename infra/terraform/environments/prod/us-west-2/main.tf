@@ -7,6 +7,10 @@ data "aws_caller_identity" "current" {}
 
 data "aws_elb_service_account" "main" {}
 
+data "aws_db_instance" "rds" {
+  db_instance_identifier = "carshub-db-produseast1"
+}
+
 # -----------------------------------------------------------------------------------------
 # VPC Configuration
 # -----------------------------------------------------------------------------------------
@@ -351,8 +355,8 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring_policy" {
 
 module "carshub_db" {
   source     = "../../../modules/rds"
-  db_name    = "carshubdb${var.env}useast1"
-  identifier = "carshub-db-${var.env}"
+  db_name    = "carshubdb${var.env}uswest2"
+  identifier = "carshub-db-${var.env}uswest2"
 
   allocated_storage     = 100
   max_allocated_storage = 500
@@ -364,12 +368,12 @@ module "carshub_db" {
 
   engine                     = "mysql"
   engine_version             = "8.0.40"
-  instance_class             = "db.r6g.large"
+  instance_class             = "db.t3.medium"
   auto_minor_version_upgrade = true
 
   deletion_protection = false
 
-  multi_az = true
+  multi_az = false
 
   username                            = tostring(data.vault_generic_secret.rds.data["username"])
   password                            = tostring(data.vault_generic_secret.rds.data["password"])
@@ -380,18 +384,18 @@ module "carshub_db" {
   vpc_security_group_ids = [module.carshub_rds_sg.id]
   publicly_accessible    = false
 
-  backup_retention_period   = 35
-  backup_window             = "03:00-06:00"
+  backup_retention_period   = 7
+  backup_window             = "05:00-07:00"
   copy_tags_to_snapshot     = true
   skip_final_snapshot       = true
   final_snapshot_identifier = "carshub-db-final-snapshot-${var.env}"
 
-  maintenance_window = "sun:08:00-sun:10:00"
+  maintenance_window = "sat:08:00-sat:10:00"
 
-  enabled_cloudwatch_logs_exports       = ["audit", "error", "general", "slowquery"]
-  performance_insights_enabled          = true
+  enabled_cloudwatch_logs_exports       = ["error", "slowquery"]
+  performance_insights_enabled          = false
   performance_insights_retention_period = 7
-  monitoring_interval                   = 60
+  monitoring_interval                   = 0
   # performance_insights_kms_key_id       = module.carshub_kms_rds.arn
   monitoring_role_arn = aws_iam_role.rds_monitoring_role.arn
 
@@ -400,7 +404,7 @@ module "carshub_db" {
   parameters = [
     {
       name  = "max_connections"
-      value = "1000"
+      value = "500"
     },
     # {
     #   name  = "innodb_buffer_pool_size"
@@ -448,10 +452,15 @@ module "carshub_db" {
     # }
   ]
   tags = {
-    Name        = "carshub-db-${var.env}"
+    Name        = "carshubdb${var.env}uswest2"
     Environment = "${var.env}"
     Project     = var.project
   }
+}
+
+resource "aws_db_instance_automated_backups_replication" "primary_backup_replication" {
+  source_db_instance_arn = data.aws_db_instance.rds.db_instance_arn
+  retention_period       = 7
 }
 
 # -----------------------------------------------------------------------------------------

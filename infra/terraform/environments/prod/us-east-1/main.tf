@@ -352,7 +352,7 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring_policy" {
 module "carshub_db" {
   source     = "../../../modules/rds"
   db_name    = "carshubdb${var.env}useast1"
-  identifier = "carshub-db-${var.env}"
+  identifier = "carshub-db-${var.env}useast1"
 
   allocated_storage     = 100
   max_allocated_storage = 500
@@ -520,6 +520,94 @@ module "carshub_media_bucket" {
     Environment = "${var.env}"
     Project     = var.project
   }
+}
+
+module "s3_replication_role" {
+  source             = "../../../modules/iam"
+  role_name          = "carshub-s3-replication-role-${var.env}-${var.region}"
+  role_description   = "IAM role for S3 replication"
+  policy_name        = "carshub-s3-replication-policy-${var.env}-${var.region}"
+  policy_description = "IAM policy for S3 replication"
+  assume_role_policy = <<EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": "sts:AssumeRole",
+                "Principal": {
+                  "Service": "s3.amazonaws.com"
+                },
+                "Effect": "Allow",
+                "Sid": ""
+            }
+        ]
+    }
+    EOF
+  policy             = <<EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": [
+                  "s3:GetReplicationConfiguration",
+                  "s3:ListBucket"
+                ],
+                "Resource": "${module.carshub_media_bucket.arn}",
+                "Effect": "Allow"
+            },
+            {
+                "Action": [
+                  "s3:GetObjectVersionForReplication",
+                  "s3:GetObjectVersionAcl",
+                  "s3:GetObjectVersionTagging"
+                ],
+                "Resource": "${module.carshub_media_bucket.arn}/*",
+                "Effect": "Allow"
+            },
+            {
+                "Action": [
+                  "s3:ReplicateObject",
+                  "s3:ReplicateDelete",
+                  "s3:ReplicateTags",
+                  "s3:ObjectOwnerOverrideToBucketOwner"
+                ],
+                "Resource": "arn:aws:s3:::carshub-media-bucket-${var.env}-us-west-2/*"
+                "Effect": "Allow"
+            }
+        ]
+    }
+    EOF
+  tags = {
+    Name        = "carshub-s3-replication-role-${var.env}-${var.region}"
+    Environment = var.env
+    Project     = var.project
+  }
+}
+
+resource "aws_s3_bucket_replication_configuration" "media_bucket_replication" {
+  bucket = module.carshub_media_bucket.bucket
+  role   = module.s3_replication_role.arn
+
+  rule {
+    id     = "replicate-all-to-us-west-2"
+    status = "Enabled"
+
+    # Replicate everything — images/ and documents/ both
+    filter {}
+
+    destination {
+      bucket        = "arn:aws:s3:::carshub-media-bucket${var.env}-us-west-2"
+      storage_class = "STANDARD_IA" # 💰 cheaper storage class for DR copies
+    }
+
+    # Replicate delete markers so deletions sync to secondary
+    delete_marker_replication {
+      status = "Enabled"
+    }
+  }
+
+  # Versioning must be enabled on the source — it already is in your module
+  depends_on = [module.carshub_media_bucket]
 }
 
 module "carshub_media_update_function_code" {
@@ -1159,90 +1247,6 @@ module "carshub_backend_lb" {
   }
 }
 
-# # Frontend Load Balancer
-# module "carshub_frontend_lb" {
-#   source                     = "../../../modules/load-balancer"
-#   lb_name                    = "carshub-frontend-lb-${var.env}"
-#   lb_is_internal             = false
-#   lb_ip_address_type         = "ipv4"
-#   load_balancer_type         = "application"
-#   enable_deletion_protection = true
-#   security_groups            = [module.carshub_frontend_lb_sg.id]
-#   subnets                    = module.carshub_vpc.public_subnets
-#   target_groups = [
-#     {
-#       target_group_name                = "carshub-frontend-tg-${var.env}"
-#       target_port                      = 80
-#       target_ip_address_type           = "ipv4"
-#       target_protocol                  = "HTTP"
-#       target_type                      = "instance"
-#       target_vpc_id                    = module.carshub_vpc.vpc_id
-#       health_check_interval            = 30
-#       health_check_path                = "/auth/signin"
-#       health_check_enabled             = true
-#       health_check_protocol            = "HTTP"
-#       health_check_timeout             = 5
-#       health_check_healthy_threshold   = 3
-#       health_check_unhealthy_threshold = 3
-#       health_check_port                = 80
-#     }
-#   ]
-#   listeners = [
-#     {
-#       listener_port     = 80
-#       listener_protocol = "HTTP"
-#       default_actions = [
-#         {
-#           type             = "forward"
-#           target_group_arn = module.carshub_frontend_lb.target_groups[0].arn
-#         }
-#       ]
-#     }
-#   ]
-# }
-
-# # Backend Load Balancer
-# module "carshub_backend_lb" {
-#   source                     = "../../../modules/load-balancer"
-#   lb_name                    = "carshub-backend-lb-${var.env}"
-#   lb_is_internal             = false
-#   lb_ip_address_type         = "ipv4"
-#   load_balancer_type         = "application"
-#   enable_deletion_protection = true
-#   security_groups            = [module.carshub_backend_lb_sg.id]
-#   subnets                    = module.carshub_vpc.public_subnets
-#   target_groups = [
-#     {
-#       target_group_name                = "carshub-backend-tg-${var.env}"
-#       target_port                      = 80
-#       target_ip_address_type           = "ipv4"
-#       target_protocol                  = "HTTP"
-#       target_type                      = "instance"
-#       target_vpc_id                    = module.carshub_vpc.vpc_id
-#       health_check_interval            = 30
-#       health_check_path                = "/"
-#       health_check_enabled             = true
-#       health_check_protocol            = "HTTP"
-#       health_check_timeout             = 5
-#       health_check_healthy_threshold   = 3
-#       health_check_unhealthy_threshold = 3
-#       health_check_port                = 80
-#     }
-#   ]
-#   listeners = [
-#     {
-#       listener_port     = 80
-#       listener_protocol = "HTTP"
-#       default_actions = [
-#         {
-#           type             = "forward"
-#           target_group_arn = module.carshub_backend_lb.target_groups[0].arn
-#         }
-#       ]
-#     }
-#   ]
-# }
-
 # -----------------------------------------------------------------------------------------
 # Cloudwath Alarm Configuration
 # -----------------------------------------------------------------------------------------
@@ -1470,7 +1474,7 @@ module "carshub_waf" {
   source = "../../../modules/waf"
 
   # Naming — matches your existing convention
-  name = "carshub-${var.env}-${var.region}"
+  name = "carshub-waf-${var.env}-${var.region}"
 
   # Attach WAF to the public-facing Frontend ALB
   # Replace with your actual frontend ALB ARN output
