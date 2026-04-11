@@ -7,5 +7,5 @@ resource "aws_sqs_queue" "queue" {
   visibility_timeout_seconds = var.visibility_timeout_seconds
   receive_wait_time_seconds  = var.receive_wait_time_seconds
   policy = var.policy
-  tags = concat({},var.tags)
+  tags = var.tags
 }

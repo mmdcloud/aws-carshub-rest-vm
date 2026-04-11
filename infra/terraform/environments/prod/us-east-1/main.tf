@@ -1538,9 +1538,9 @@ module "carshub_waf" {
   # Alarm Thresholds — tune after observing normal traffic
   # ---------------------------------------------------
 
-  alarm_blocked_requests_threshold = 500   # > 500 total blocks in 5 min = alert
-  alarm_rate_limit_threshold       = 100   # > 100 rate-limit hits in 5 min = alert
-  alarm_auth_rate_limit_threshold  = 20    # > 20 auth blocks in 5 min = alert
+  alarm_blocked_requests_threshold = 500 # > 500 total blocks in 5 min = alert
+  alarm_rate_limit_threshold       = 100 # > 100 rate-limit hits in 5 min = alert
+  alarm_auth_rate_limit_threshold  = 20  # > 20 auth blocks in 5 min = alert
 
   tags = {
     Name        = "carshub-waf-${var.env}-${var.region}"
