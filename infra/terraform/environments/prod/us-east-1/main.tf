@@ -251,6 +251,15 @@ module "carshub_db_credentials" {
   }
 }
 
+resource "aws_secretsmanager_secret_replication" "carshub_db_credentials_replica" {
+  secret_id = module.carshub_db_credentials.id
+
+  replicas {
+    region     = "us-west-2"
+    kms_key_id = "alias/aws/secretsmanager"
+  }
+}
+
 # -----------------------------------------------------------------------------------------
 # VPC Flow Logs
 # -----------------------------------------------------------------------------------------

@@ -15,6 +15,10 @@ data "aws_s3_bucket" "media_useast1_bucket" {
   bucket = "carshub-media-bucket-prod-us-east-1"
 }
 
+data "aws_secretsmanager_secret" "carshub_db_credentials" {  
+  name = "carshub-rds-secret-prod-us-east-1"
+}
+
 # -----------------------------------------------------------------------------------------
 # VPC Configuration
 # -----------------------------------------------------------------------------------------
@@ -907,7 +911,7 @@ module "carshub_media_update_function_iam_role" {
             {
               "Effect": "Allow",
               "Action": "secretsmanager:GetSecretValue",
-              "Resource": "${module.carshub_db_credentials.arn}"
+              "Resource": "${data.aws_secretsmanager_secret.carshub_db_credentials.arn}"
             },
             {
                 "Action": ["s3:GetObject", "s3:PutObject"],
@@ -970,7 +974,7 @@ module "carshub_media_update_function" {
     target_arn = module.carshub_media_events_dlq.arn
   }
   env_variables = {
-    SECRET_NAME = module.carshub_db_credentials.name
+    SECRET_NAME = data.aws_secretsmanager_secret.carshub_db_credentials.name
     DB_HOST     = tostring(split(":", module.carshub_db.endpoint)[0])
     DB_NAME     = var.db_name
     REGION      = var.region
