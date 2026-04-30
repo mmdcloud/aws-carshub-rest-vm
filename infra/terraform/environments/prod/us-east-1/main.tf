@@ -121,6 +121,14 @@ module "carshub_asg_frontend_sg" {
       protocol        = "tcp"
       security_groups = [module.carshub_frontend_lb_sg.id]
       cidr_blocks     = []
+    },
+    {
+      description     = "SSH Traffic"
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      security_groups = []
+      cidr_blocks     = ["0.0.0.0/0"]
     }
   ]
   egress_rules = [
@@ -151,6 +159,14 @@ module "carshub_asg_backend_sg" {
       protocol        = "tcp"
       security_groups = [module.carshub_backend_lb_sg.id]
       cidr_blocks     = []
+    },
+    {
+      description     = "SSH Traffic"
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      security_groups = []
+      cidr_blocks     = ["0.0.0.0/0"]
     }
   ]
   egress_rules = [
@@ -237,28 +253,34 @@ module "carshub_lambda_sg" {
 # -----------------------------------------------------------------------------------------
 module "carshub_db_credentials" {
   source                  = "../../../modules/secrets-manager"
-  name                    = "carshub-rds-secret-${var.env}-${var.region}"
+  name                    = "carshub-rds-secrets-${var.env}-${var.region}"
   description             = "Secret for storing RDS credentials"
   recovery_window_in_days = 0
   secret_string = jsonencode({
     username = tostring(data.vault_generic_secret.rds.data["username"])
     password = tostring(data.vault_generic_secret.rds.data["password"])
   })
+  replica = [
+    {
+      region     = "us-west-2"
+      kms_key_id = "alias/aws/secretsmanager"
+    }
+  ]
   tags = {
-    Name        = "carshub-rds-secret-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Name        = "carshub-rds-secrets-${var.env}-${var.region}"
+    Environment = var.env
     Project     = var.project
   }
 }
 
-resource "aws_secretsmanager_secret_replication" "carshub_db_credentials_replica" {
-  secret_id = module.carshub_db_credentials.id
+# resource "aws_secretsmanager_secret_replication" "carshub_db_credentials_replica" {
+#   secret_id = module.carshub_db_credentials.id
 
-  replicas {
-    region     = "us-west-2"
-    kms_key_id = "alias/aws/secretsmanager"
-  }
-}
+#   replicas {
+#     region     = "us-west-2"
+#     kms_key_id = "alias/aws/secretsmanager"
+#   }
+# }
 
 # -----------------------------------------------------------------------------------------
 # VPC Flow Logs
@@ -987,13 +1009,28 @@ resource "aws_iam_instance_profile" "iam_instance_profile" {
   role = module.iam_instance_profile_role.name
 }
 
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"]
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 # Carshub frontend instance template
 module "carshub_frontend_launch_template" {
   source                               = "../../../modules/launch_template"
   name                                 = "carshub_frontend_launch_template_${var.env}"
   description                          = "carshub_frontend_launch_template_${var.env}"
   ebs_optimized                        = false
-  image_id                             = "ami-005fc0f236362e99f"
+  image_id                             = data.aws_ami.ubuntu.id
   instance_type                        = "t2.micro"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
@@ -1016,7 +1053,7 @@ module "carshub_backend_launch_template" {
   name                                 = "carshub_backend_launch_template_${var.env}"
   description                          = "carshub_backend_launch_template_${var.env}"
   ebs_optimized                        = false
-  image_id                             = "ami-005fc0f236362e99f"
+  image_id                             = data.aws_ami.ubuntu.id
   instance_type                        = "t2.micro"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
@@ -1046,7 +1083,7 @@ module "carshub_frontend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups["carshub_frontend_lb_target_group"].arn]
-  vpc_zone_identifier       = module.carshub_vpc.private_subnets
+  vpc_zone_identifier       = module.carshub_vpc.public_subnets
   launch_template_id        = module.carshub_frontend_launch_template.id
   launch_template_version   = "$Latest"
 }
@@ -1062,7 +1099,7 @@ module "carshub_backend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn]
-  vpc_zone_identifier       = module.carshub_vpc.private_subnets
+  vpc_zone_identifier       = module.carshub_vpc.public_subnets
   launch_template_id        = module.carshub_backend_launch_template.id
   launch_template_version   = "$Latest"
 }

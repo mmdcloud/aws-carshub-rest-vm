@@ -16,7 +16,7 @@ cd /home/ubuntu
 mkdir nodeapp
 # Checking out from Version Control
 git clone https://github.com/mmdcloud/carshub-rest
-cd carshub-rest/frontend
+cd carshub-rest/src/frontend
 cp -r . /home/ubuntu/nodeapp/
 cd /home/ubuntu/nodeapp/
 # Setting up env variables

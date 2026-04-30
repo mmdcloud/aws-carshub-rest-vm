@@ -17,7 +17,7 @@ cd /home/ubuntu
 mkdir nodeapp
 # Checking out from Version Control
 git clone https://github.com/mmdcloud/carshub-rest
-cd carshub-rest/backend/api
+cd carshub-rest/src/backend/api
 cp -r . /home/ubuntu/nodeapp/
 cd /home/ubuntu/nodeapp/
 
