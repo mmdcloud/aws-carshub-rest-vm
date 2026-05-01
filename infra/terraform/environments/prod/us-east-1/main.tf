@@ -121,14 +121,6 @@ module "carshub_asg_frontend_sg" {
       protocol        = "tcp"
       security_groups = [module.carshub_frontend_lb_sg.id]
       cidr_blocks     = []
-    },
-    {
-      description     = "SSH Traffic"
-      from_port       = 22
-      to_port         = 22
-      protocol        = "tcp"
-      security_groups = []
-      cidr_blocks     = ["0.0.0.0/0"]
     }
   ]
   egress_rules = [
@@ -159,14 +151,6 @@ module "carshub_asg_backend_sg" {
       protocol        = "tcp"
       security_groups = [module.carshub_backend_lb_sg.id]
       cidr_blocks     = []
-    },
-    {
-      description     = "SSH Traffic"
-      from_port       = 22
-      to_port         = 22
-      protocol        = "tcp"
-      security_groups = []
-      cidr_blocks     = ["0.0.0.0/0"]
     }
   ]
   egress_rules = [
@@ -272,15 +256,6 @@ module "carshub_db_credentials" {
     Project     = var.project
   }
 }
-
-# resource "aws_secretsmanager_secret_replication" "carshub_db_credentials_replica" {
-#   secret_id = module.carshub_db_credentials.id
-
-#   replicas {
-#     region     = "us-west-2"
-#     kms_key_id = "alias/aws/secretsmanager"
-#   }
-# }
 
 # -----------------------------------------------------------------------------------------
 # VPC Flow Logs
@@ -1031,13 +1006,13 @@ module "carshub_frontend_launch_template" {
   description                          = "carshub_frontend_launch_template_${var.env}"
   ebs_optimized                        = false
   image_id                             = data.aws_ami.ubuntu.id
-  instance_type                        = "t2.micro"
+  instance_type                        = "t3.medium"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = true
+      associate_public_ip_address = false
       security_groups             = [module.carshub_asg_frontend_sg.id]
     }
   ]
@@ -1054,13 +1029,13 @@ module "carshub_backend_launch_template" {
   description                          = "carshub_backend_launch_template_${var.env}"
   ebs_optimized                        = false
   image_id                             = data.aws_ami.ubuntu.id
-  instance_type                        = "t2.micro"
+  instance_type                        = "t3.medium"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
   key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
-      associate_public_ip_address = true
+      associate_public_ip_address = false
       security_groups             = [module.carshub_asg_backend_sg.id]
     }
   ]
@@ -1083,7 +1058,7 @@ module "carshub_frontend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups["carshub_frontend_lb_target_group"].arn]
-  vpc_zone_identifier       = module.carshub_vpc.public_subnets
+  vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_frontend_launch_template.id
   launch_template_version   = "$Latest"
 }
@@ -1099,7 +1074,7 @@ module "carshub_backend_asg" {
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn]
-  vpc_zone_identifier       = module.carshub_vpc.public_subnets
+  vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_backend_launch_template.id
   launch_template_version   = "$Latest"
 }
