@@ -122,8 +122,8 @@ module "carshub_asg_frontend_sg" {
   ingress_rules = [
     {
       description     = "ASG Frontend Traffic"
-      from_port       = 3000
-      to_port         = 3000
+      from_port       = 80
+      to_port         = 80
       protocol        = "tcp"
       security_groups = [module.carshub_frontend_lb_sg.id]
       cidr_blocks     = []
@@ -1141,7 +1141,7 @@ module "carshub_frontend_asg" {
   min_size                  = 3
   max_size                  = 50
   desired_capacity          = 3
-  health_check_grace_period = 300
+  health_check_grace_period = 600
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_frontend_lb.target_groups["carshub_frontend_lb_target_group"].arn]
@@ -1157,7 +1157,7 @@ module "carshub_backend_asg" {
   min_size                  = 3
   max_size                  = 50
   desired_capacity          = 3
-  health_check_grace_period = 300
+  health_check_grace_period = 600
   health_check_type         = "ELB"
   force_delete              = true
   target_group_arns         = [module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn]
@@ -1197,14 +1197,14 @@ module "carshub_frontend_lb" {
   target_groups = {
     carshub_frontend_lb_target_group = {
       backend_protocol = "HTTP"
-      backend_port     = 3000
+      backend_port     = 80
       target_type      = "instance"
       health_check = {
         enabled             = true
         healthy_threshold   = 3
         interval            = 30
         path                = "/auth/signin"
-        port                = 3000
+        port                = 8
         protocol            = "HTTP"
         unhealthy_threshold = 3
       }
