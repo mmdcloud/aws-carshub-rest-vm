@@ -1,4 +1,6 @@
+# -----------------------------------------------------------------------------------------
 # Registering vault provider
+# -----------------------------------------------------------------------------------------
 data "vault_generic_secret" "rds" {
   path = "secret/rds"
 }
@@ -6,6 +8,10 @@ data "vault_generic_secret" "rds" {
 data "aws_caller_identity" "current" {}
 
 data "aws_elb_service_account" "main" {}
+
+resource "random_id" "id" {
+  byte_length = 8
+}
 
 # -----------------------------------------------------------------------------------------
 # VPC Configuration
@@ -81,7 +87,7 @@ module "carshub_backend_lb_sg" {
       from_port       = 80
       to_port         = 80
       protocol        = "tcp"
-      security_groups = [module.carshub_frontend_lb_sg.id]
+      security_groups = [module.carshub_asg_frontend_sg.id]
       cidr_blocks     = []
     },
     {
@@ -89,7 +95,7 @@ module "carshub_backend_lb_sg" {
       from_port       = 443
       to_port         = 443
       protocol        = "tcp"
-      security_groups = [module.carshub_frontend_lb_sg.id]
+      security_groups = [module.carshub_asg_frontend_sg.id]
       cidr_blocks     = []
     }
   ]
@@ -330,13 +336,15 @@ module "flow_logs_role" {
         "Statement": [
             {
                 "Action": [
-                  "logs:CreateLogGroup",
                   "logs:CreateLogStream",
                   "logs:PutLogEvents",
                   "logs:DescribeLogGroups",
                   "logs:DescribeLogStreams"
                 ],
-                "Resource": "*",
+                "Resource": [
+                  "${module.carshub_flow_log_group.arn}",
+                  "${module.carshub_flow_log_group.arn}:*"
+                ],
                 "Effect": "Allow"
             }
         ]
@@ -344,7 +352,7 @@ module "flow_logs_role" {
     EOF
   tags = {
     Name        = "carshub-flow-logs-role-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -353,7 +361,7 @@ module "carshub_flow_log_group" {
   source            = "../../../modules/cloudwatch/cloudwatch-log-group"
   log_group_name    = "/aws/vpc/flow-logs/carshub-application-${var.env}-${var.region}"
   skip_destroy      = false
-  retention_in_days = 0
+  retention_in_days = 0 # dont set it to 0 when production is considered 
 }
 
 # Add VPC Flow Logs for security monitoring
@@ -362,6 +370,10 @@ resource "aws_flow_log" "carshub_vpc_flow_log" {
   log_destination = module.carshub_flow_log_group.arn
   traffic_type    = "ALL"
   vpc_id          = module.carshub_vpc.vpc_id
+  depends_on = [
+    module.carshub_flow_log_group,
+    module.flow_logs_role
+  ]
 }
 
 # -----------------------------------------------------------------------------------------
@@ -855,7 +867,7 @@ module "carshub_media_update_function_iam_role" {
             {
               "Effect": "Allow",
               "Action": "secretsmanager:GetSecretValue",
-              "Resource": "${module.carshub_db_credentials.arn}"
+              "Resource": "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:carshub-rds-secrets-${var.env}-${var.region}-*"
             },
             {
                 "Action": ["s3:GetObject", "s3:PutObject"],
@@ -966,22 +978,38 @@ module "carshub_media_cloudfront_distribution" {
   enabled                               = true
   origin = [
     {
-      origin_id           = "carshub-media-bucket-${var.env}"
+      origin_id           = "carshub-media-bucket-${var.env}-${var.region}"
       domain_name         = "carshub-media-bucket-${var.env}.s3.${var.region}.amazonaws.com"
+      connection_attempts = 3
+      connection_timeout  = 10
+    },
+    {
+      origin_id           = "carshub-media-bucket-${var.env}-us-west-2"
+      domain_name         = "carshub-media-bucket-${var.env}.s3.us-west-2.amazonaws.com"
       connection_attempts = 3
       connection_timeout  = 10
     }
   ]
+  origin_groups = [
+    {
+      origin_id    = "carshub-media-origin-group-${var.env}"
+      status_codes = [500, 502, 503, 504, 403, 404]
+      members = [
+        "carshub-media-bucket-${var.env}-${var.region}",
+        "carshub-media-bucket-${var.env}-us-west-2"
+      ]
+    }
+  ]
   compress                       = true
   smooth_streaming               = false
-  target_origin_id               = "carshub-media-bucket-${var.env}"
+  target_origin_id               = "carshub-media-origin-group-${var.env}"
   allowed_methods                = ["GET", "HEAD"]
   cached_methods                 = ["GET", "HEAD"]
   viewer_protocol_policy         = "redirect-to-https"
   min_ttl                        = 0
   default_ttl                    = 86400
   max_ttl                        = 31536000
-  price_class                    = "PriceClass_100"
+  price_class                    = "PriceClass_200"
   forward_cookies                = "all"
   cloudfront_default_certificate = true
   geo_restriction_type           = "none"
