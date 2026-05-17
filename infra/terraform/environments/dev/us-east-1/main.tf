@@ -999,7 +999,7 @@ module "carshub_frontend_launch_template" {
   instance_type                        = "t2.micro"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
-  key_name                             = "madmaxkeypair"
+  
   network_interfaces = [
     {
       associate_public_ip_address = true
@@ -1022,7 +1022,7 @@ module "carshub_backend_launch_template" {
   instance_type                        = "t2.micro"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
-  key_name                             = "madmaxkeypair"
+  
   network_interfaces = [
     {
       associate_public_ip_address = true
