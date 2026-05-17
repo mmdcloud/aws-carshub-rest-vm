@@ -1066,6 +1066,17 @@ module "iam_instance_profile_role" {
   }
 }
 
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = module.iam_instance_profile_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# CloudWatch agent — allows the instance to push logs/metrics
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = module.iam_instance_profile_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
 resource "aws_iam_instance_profile" "iam_instance_profile" {
   name = "iam-instance-profile"
   role = module.iam_instance_profile_role.name
@@ -1096,7 +1107,6 @@ module "carshub_frontend_launch_template" {
   instance_type                        = "t3.medium"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
-  key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
       associate_public_ip_address = false
@@ -1119,7 +1129,6 @@ module "carshub_backend_launch_template" {
   instance_type                        = "t3.medium"
   instance_initiated_shutdown_behavior = "stop"
   instance_profile_name                = aws_iam_instance_profile.iam_instance_profile.name
-  key_name                             = "madmaxkeypair"
   network_interfaces = [
     {
       associate_public_ip_address = false
