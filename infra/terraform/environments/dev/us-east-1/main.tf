@@ -1039,7 +1039,7 @@ module "carshub_frontend_asg" {
   target_group_arns         = [module.carshub_frontend_lb.target_groups["carshub_frontend_lb_target_group"].arn]
   vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_frontend_launch_template.id
-  launch_template_version   = "$Latest"
+  launch_template_version   = "$Default"
 }
 
 # Auto Scaling Group for Backend Template
@@ -1055,7 +1055,7 @@ module "carshub_backend_asg" {
   target_group_arns         = [module.carshub_backend_lb.target_groups["carshub_backend_lb_target_group"].arn]
   vpc_zone_identifier       = module.carshub_vpc.private_subnets
   launch_template_id        = module.carshub_backend_launch_template.id
-  launch_template_version   = "$Latest"
+  launch_template_version   = "$Default"
 }
 
 # -----------------------------------------------------------------------------------------
