@@ -1078,6 +1078,17 @@ module "iam_instance_profile_role" {
   }
 }
 
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = module.iam_instance_profile_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# CloudWatch agent — allows the instance to push logs/metrics
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = module.iam_instance_profile_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
 resource "aws_iam_instance_profile" "iam_instance_profile" {
   name = "iam-instance-profile"
   role = module.iam_instance_profile_role.name
