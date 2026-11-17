@@ -5,12 +5,13 @@ resource "aws_cloudwatch_metric_alarm" "alarm" {
   metric_name         = var.metric_name
   namespace           = var.namespace
   period              = var.period
-  statistic           = var.statistic
+  statistic           = var.extended_statistic != "" ? null : (var.statistic != "" ? var.statistic : null)
+  extended_statistic  = var.extended_statistic != "" ? var.extended_statistic : null
   threshold           = var.threshold
-  alarm_description   = var.alarm_description 
+  alarm_description   = var.alarm_description
   alarm_actions       = var.alarm_actions
   ok_actions          = var.ok_actions
-  dimensions = var.dimensions
+  dimensions          = var.dimensions
   tags = {
     Name = var.alarm_name
   }

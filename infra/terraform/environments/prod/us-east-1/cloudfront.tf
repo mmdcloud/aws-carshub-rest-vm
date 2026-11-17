@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------------------
-# Cloudfront distribution
+# CloudFront Distribution
 # -----------------------------------------------------------------------------------------
 module "carshub_media_cloudfront_distribution" {
   source                                = "../../../modules/cloudfront"
@@ -13,13 +13,13 @@ module "carshub_media_cloudfront_distribution" {
   origin = [
     {
       origin_id           = "carshub-media-bucket-${var.env}-${var.region}"
-      domain_name         = "carshub-media-bucket-${var.env}.s3.${var.region}.amazonaws.com"
+      domain_name         = "carshub-media-bucket-${var.env}-${var.region}.s3.${var.region}.amazonaws.com"
       connection_attempts = 3
       connection_timeout  = 10
     },
     {
       origin_id           = "carshub-media-bucket-${var.env}-us-west-2"
-      domain_name         = "carshub-media-bucket-${var.env}.s3.us-west-2.amazonaws.com"
+      domain_name         = "carshub-media-bucket-${var.env}-us-west-2.s3.us-west-2.amazonaws.com"
       connection_attempts = 3
       connection_timeout  = 10
     }
@@ -50,7 +50,7 @@ module "carshub_media_cloudfront_distribution" {
   query_string                   = true
   tags = {
     Name        = "carshub-media-cdn-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }

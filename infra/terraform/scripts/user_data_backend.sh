@@ -3,8 +3,8 @@ set -e
 exec > /var/log/user-data.log 2>&1
 sudo apt-get update -y
 sudo apt-get upgrade -y
-# Installing Nginx
-sudo apt-get install -y nginx
+# Installing Nginx, jq, awscli
+sudo apt-get install -y nginx jq awscli
 # Installing Node.js
 curl -sL https://deb.nodesource.com/setup_20.x -o nodesource_setup.sh
 sudo bash nodesource_setup.sh
@@ -14,18 +14,26 @@ sudo npm i -g pm2
 # Installing Nest CLI
 sudo npm install -g @nestjs/cli
 cd /home/ubuntu
-mkdir nodeapp
+mkdir -p nodeapp
 # Checking out from Version Control
 git clone https://github.com/mmdcloud/carshub-rest
 cd carshub-rest/src/backend/api
 cp -r . /home/ubuntu/nodeapp/
 cd /home/ubuntu/nodeapp/
 
-# cat > .env <<EOL
-# DB_PATH=${DB_PATH}
-# UN=${UN}
-# CREDS=${CREDS}
-# EOL
+# Retrieve database credentials dynamically from Secrets Manager if SECRET_NAME is provided
+DB_USER="${UN}"
+DB_PASSWORD="${CREDS}"
+
+if [ -n "${SECRET_NAME}" ]; then
+  SECRET_PAYLOAD=$(aws secretsmanager get-secret-value --secret-id "${SECRET_NAME}" --region "${REGION}" --query SecretString --output text 2>/dev/null || echo "")
+  if [ -n "$SECRET_PAYLOAD" ]; then
+    RESOLVED_USER=$(echo "$SECRET_PAYLOAD" | jq -r '.username // empty')
+    RESOLVED_PASS=$(echo "$SECRET_PAYLOAD" | jq -r '.password // empty')
+    [ -n "$RESOLVED_USER" ] && DB_USER="$RESOLVED_USER"
+    [ -n "$RESOLVED_PASS" ] && DB_PASSWORD="$RESOLVED_PASS"
+  fi
+fi
 
 cat > src/database.providers.ts <<EOL
 import { Sequelize } from 'sequelize-typescript';
@@ -47,12 +55,9 @@ export const databaseProviders = [
                 dialect: 'mysql',
                 host: "${DB_PATH}",
                 port: 3306,
-                // dialectOptions:{
-                //     sockerPath:process.env.DB_PATH
-                // },
-                username: "${UN}",
-                password: "${CREDS}",                
-                database: 'carshub',
+                username: "$DB_USER",
+                password: "$DB_PASSWORD",                
+                database: '${DB_NAME}',
             });
             sequelize.addModels([
                 User, Brand, Buyer, VehicleModel, VehicleOwner, ExtraService,
@@ -78,15 +83,3 @@ sudo npm run build
 # Starting PM2 app
 pm2 start dist/main.js
 sudo service nginx restart
-
-# Installing AWS CloudWatch Agent
-# sudo apt-get update
-# sudo apt-get install -y wget curl unzip
-# wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-# sudo dpkg -i amazon-cloudwatch-agent.deb
-# sudo apt-get install -f
-# sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-config-wizard
-# sudo systemctl enable amazon-cloudwatch-agent
-# sudo systemctl start amazon-cloudwatch-agent
-# sudo systemctl status amazon-cloudwatch-agent
-# echo "CloudWatch agent installation completed"

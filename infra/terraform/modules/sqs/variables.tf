@@ -4,9 +4,16 @@ variable "max_message_size" {}
 variable "message_retention_seconds" {}
 variable "visibility_timeout_seconds" {}
 variable "receive_wait_time_seconds" {}
-variable "maxReceiveCount" {}
-variable "policy" {}
+variable "maxReceiveCount" {
+  default = null
+}
+variable "dead_letter_target_arn" {
+  default = null
+}
+variable "policy" {
+  default = ""
+}
 variable "tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }

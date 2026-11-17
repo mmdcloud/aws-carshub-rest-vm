@@ -15,7 +15,8 @@ variable "project" {
 }
 
 variable "vehicle-images-code-version" {
-  type = string
+  type    = string
+  default = "1"
 }
 
 variable "public_subnets" {
@@ -36,4 +37,10 @@ variable "database_subnets" {
 variable "azs" {
   type        = list(string)
   description = "Availability Zones"
+}
+
+variable "alarm_email" {
+  type        = string
+  description = "Email address for CloudWatch alarm notifications"
+  default     = "madmaxcloudonline@gmail.com"
 }

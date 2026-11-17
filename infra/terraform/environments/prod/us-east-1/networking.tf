@@ -18,12 +18,14 @@ module "carshub_vpc" {
   one_nat_gateway_per_az  = true
   tags = {
     Name        = "carshub-vpc-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
 
-# Security Group
+# -----------------------------------------------------------------------------------------
+# Security Groups
+# -----------------------------------------------------------------------------------------
 module "carshub_frontend_lb_sg" {
   source = "../../../modules/security-groups"
   name   = "carshub-frontend-lb-sg-${var.env}-${var.region}"
@@ -57,7 +59,7 @@ module "carshub_frontend_lb_sg" {
   ]
   tags = {
     Name        = "carshub-frontend-lb-sg-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -68,7 +70,7 @@ module "carshub_backend_lb_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description     = "HTTP Backend Traffic"
+      description     = "HTTP Backend Traffic from Frontend ASG"
       from_port       = 80
       to_port         = 80
       protocol        = "tcp"
@@ -76,7 +78,7 @@ module "carshub_backend_lb_sg" {
       cidr_blocks     = []
     },
     {
-      description     = "HTTPS Backend Traffic"
+      description     = "HTTPS Backend Traffic from Frontend ASG"
       from_port       = 443
       to_port         = 443
       protocol        = "tcp"
@@ -95,7 +97,7 @@ module "carshub_backend_lb_sg" {
   ]
   tags = {
     Name        = "carshub-backend-lb-sg-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -106,7 +108,7 @@ module "carshub_asg_frontend_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description     = "ASG Frontend Traffic"
+      description     = "ASG Frontend Traffic from Frontend LB"
       from_port       = 80
       to_port         = 80
       protocol        = "tcp"
@@ -125,7 +127,7 @@ module "carshub_asg_frontend_sg" {
   ]
   tags = {
     Name        = "carshub-asg-frontend-sg-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -136,7 +138,7 @@ module "carshub_asg_backend_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description     = "ASG Backend Traffic"
+      description     = "ASG Backend Traffic from Backend LB"
       from_port       = 80
       to_port         = 80
       protocol        = "tcp"
@@ -155,7 +157,7 @@ module "carshub_asg_backend_sg" {
   ]
   tags = {
     Name        = "carshub-asg-backend-sg-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -166,7 +168,7 @@ module "carshub_rds_sg" {
   vpc_id = module.carshub_vpc.vpc_id
   ingress_rules = [
     {
-      description     = "RDS Traffic"
+      description     = "MySQL from Backend ASG"
       from_port       = 3306
       to_port         = 3306
       protocol        = "tcp"
@@ -174,18 +176,10 @@ module "carshub_rds_sg" {
       cidr_blocks     = []
     }
   ]
-  egress_rules = [
-    {
-      description = "Allow all outbound traffic"
-      from_port   = 0
-      to_port     = 0
-      protocol    = "-1"
-      cidr_blocks = ["0.0.0.0/0"]
-    }
-  ]
+  egress_rules = []
   tags = {
     Name        = "carshub-rds-sg-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -247,6 +241,14 @@ module "carshub_vpc_endpoint_sg" {
       protocol        = "tcp"
       security_groups = [module.carshub_lambda_sg.id]
       cidr_blocks     = []
+    },
+    {
+      description     = "HTTPS from ASG instances"
+      from_port       = 443
+      to_port         = 443
+      protocol        = "tcp"
+      security_groups = [module.carshub_asg_backend_sg.id, module.carshub_asg_frontend_sg.id]
+      cidr_blocks     = []
     }
   ]
   egress_rules = [
@@ -267,6 +269,25 @@ module "carshub_vpc_endpoint_sg" {
 }
 
 # -----------------------------------------------------------------------------------------
+# VPC Endpoints
+# -----------------------------------------------------------------------------------------
+resource "aws_vpc_endpoint" "secretsmanager" {
+  vpc_id              = module.carshub_vpc.vpc_id
+  service_name        = "com.amazonaws.${var.region}.secretsmanager"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = module.carshub_vpc.private_subnets
+  security_group_ids  = [module.carshub_vpc_endpoint_sg.id]
+  private_dns_enabled = true
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = module.carshub_vpc.vpc_id
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = module.carshub_vpc.private_route_table_ids
+}
+
+# -----------------------------------------------------------------------------------------
 # VPC Flow Logs
 # -----------------------------------------------------------------------------------------
 module "flow_logs_role" {
@@ -275,41 +296,36 @@ module "flow_logs_role" {
   role_description   = "IAM role for VPC Flow Logs"
   policy_name        = "carshub-flow-logs-policy-${var.env}-${var.region}"
   policy_description = "IAM policy for VPC Flow Logs"
-  assume_role_policy = <<EOF
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Action": "sts:AssumeRole",
-                "Principal": {
-                  "Service": "vpc-flow-logs.amazonaws.com"
-                },
-                "Effect": "Allow",
-                "Sid": ""
-            }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+        Effect = "Allow"
+        Sid    = ""
+      }
+    ]
+  })
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
         ]
-    }
-    EOF
-  policy             = <<EOF
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Action": [
-                  "logs:CreateLogStream",
-                  "logs:PutLogEvents",
-                  "logs:DescribeLogGroups",
-                  "logs:DescribeLogStreams"
-                ],
-                "Resource": [
-                  "${module.carshub_flow_log_group.arn}",
-                  "${module.carshub_flow_log_group.arn}:*"
-                ],
-                "Effect": "Allow"
-            }
+        Resource = [
+          module.carshub_flow_log_group.arn
         ]
-    }
-    EOF
+        Effect = "Allow"
+      }
+    ]
+  })
   tags = {
     Name        = "carshub-flow-logs-role-${var.env}-${var.region}"
     Environment = var.env
@@ -321,10 +337,9 @@ module "carshub_flow_log_group" {
   source            = "../../../modules/cloudwatch/cloudwatch-log-group"
   log_group_name    = "/aws/vpc/flow-logs/carshub-application-${var.env}-${var.region}"
   skip_destroy      = false
-  retention_in_days = 0 # dont set it to 0 when production is considered 
+  retention_in_days = 30
 }
 
-# Add VPC Flow Logs for security monitoring
 resource "aws_flow_log" "carshub_vpc_flow_log" {
   iam_role_arn    = module.flow_logs_role.arn
   log_destination = module.carshub_flow_log_group.arn

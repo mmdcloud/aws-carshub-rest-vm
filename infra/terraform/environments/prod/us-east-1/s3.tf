@@ -17,14 +17,14 @@ module "carshub_media_bucket" {
   versioning_enabled = "Enabled"
   cors = [
     {
-      allowed_headers = ["${module.carshub_media_cloudfront_distribution.domain_name}"]
-      allowed_methods = ["GET"]
+      allowed_headers = ["*"]
+      allowed_methods = ["GET", "HEAD"]
       allowed_origins = ["*"]
       max_age_seconds = 3000
     },
     {
-      allowed_headers = ["${module.carshub_frontend_lb.dns_name}"]
-      allowed_methods = ["PUT"]
+      allowed_headers = ["*"]
+      allowed_methods = ["PUT", "POST"]
       allowed_origins = ["*"]
       max_age_seconds = 3000
     }
@@ -40,16 +40,16 @@ module "carshub_media_bucket" {
           "Service" : "cloudfront.amazonaws.com"
         },
         "Action" : "s3:GetObject",
-        "Resource" : "${module.carshub_media_bucket.arn}/*",
+        "Resource" : "arn:aws:s3:::carshub-media-bucket-${var.env}-${var.region}/*",
         "Condition" : {
           "StringEquals" : {
-            "AWS:SourceArn" : "${module.carshub_media_cloudfront_distribution.arn}"
+            "AWS:SourceArn" : module.carshub_media_cloudfront_distribution.arn
           }
         }
       }
     ]
   })
-  force_destroy = true
+  force_destroy = false
   bucket_notification = {
     queue = [
       {
@@ -61,7 +61,7 @@ module "carshub_media_bucket" {
   }
   tags = {
     Name        = "carshub-media-bucket-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -72,23 +72,16 @@ module "carshub_media_update_function_code" {
   objects = [
     {
       key    = "lambda.zip"
-      source = "../../../files/lambda.zip"
+      source = "${path.module}/../../../files/lambda.zip"
     }
   ]
-  bucket_policy = ""
-  cors = [
-    {
-      allowed_headers = ["*"]
-      allowed_methods = ["GET"]
-      allowed_origins = ["*"]
-      max_age_seconds = 3000
-    }
-  ]
+  bucket_policy      = ""
+  cors               = []
   versioning_enabled = "Enabled"
-  force_destroy      = true
+  force_destroy      = false
   tags = {
     Name        = "carshub-media-updatefunctioncode${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -129,25 +122,12 @@ module "carshub_frontend_lb_logs" {
       }
     ]
   })
-  cors = [
-    {
-      allowed_headers = ["*"]
-      allowed_methods = ["GET"]
-      allowed_origins = ["*"]
-      max_age_seconds = 3000
-    },
-    {
-      allowed_headers = ["*"]
-      allowed_methods = ["PUT"]
-      allowed_origins = ["*"]
-      max_age_seconds = 3000
-    }
-  ]
+  cors               = []
   versioning_enabled = "Enabled"
-  force_destroy      = true
+  force_destroy      = false
   tags = {
     Name        = "carshub-frontend-lb-logs-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
@@ -188,25 +168,12 @@ module "carshub_backend_lb_logs" {
       }
     ]
   })
-  cors = [
-    {
-      allowed_headers = ["*"]
-      allowed_methods = ["GET"]
-      allowed_origins = ["*"]
-      max_age_seconds = 3000
-    },
-    {
-      allowed_headers = ["*"]
-      allowed_methods = ["PUT"]
-      allowed_origins = ["*"]
-      max_age_seconds = 3000
-    }
-  ]
+  cors               = []
   versioning_enabled = "Enabled"
-  force_destroy      = true
+  force_destroy      = false
   tags = {
     Name        = "carshub-backend-lb-logs-${var.env}-${var.region}"
-    Environment = "${var.env}"
+    Environment = var.env
     Project     = var.project
   }
 }
